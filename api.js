@@ -11,6 +11,7 @@ function getComparableLayer(layer) {
         alias: layer.name.replace(/\W+/g, '_').toLowerCase(),
         isPublished: false
     });
+    comparableLayer.universes = _.zipObject(layer.universes, _.times(layer.universes.length, _.constant(true)));
     return comparableLayer;
 };
 
@@ -26,6 +27,7 @@ function getComparablePlace(place) {
         style: {},
         data: {}
     });
+    comparablePlace.universes = _.zipObject(place.universes, _.times(place.universes.length, _.constant(true)));
     comparablePlace.translations = _.keyBy(_.map(place.translations, function (translation) {    //Makes the translations comparable by removing the order in the array and the _id field
         return _.omit(translation, ['_id']);
     }), 'language');
@@ -40,6 +42,7 @@ function getComparablePlaceList(placeList) {
         isSearchable: true,
         data: {}
     });
+    comparablePlaceList.universes = _.zipObject(placeList.universes, _.times(placeList.universes.length, _.constant(true)));
     comparablePlaceList.translations = _.keyBy(_.map(placeList.translations, function (translation) {    //Makes the translations comparable by removing the order in the array and the _id field
         return _.omit(translation, ['_id']);
     }), 'language');
@@ -214,6 +217,50 @@ MapwizeApi.prototype = {
         };
         //console.log(this.serverUrl + '/auth/signin');
         request.post(this.serverUrl + '/auth/signin', {form: credentials, json: true}, responseWrapper(callback));
+    },
+
+    /**
+     * Get all universes of organization
+     *
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the list of universes if signing in was successful
+     */
+    getUniverses: function (callback) {
+        var url = this.serverUrl + '/api/v1/universes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, {json: true}, responseWrapper(callback));
+    },
+
+    /**
+     * Create a universe
+     * The owner need to be specified in the universe object
+     *
+     * @param universe
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: the created universe
+     */
+    createUniverse: function(universe, callback) {
+        request.post(this.serverUrl + '/api/v1/universes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+            body: universe,
+            json: true
+        }, responseWrapper(callback));
+    },
+
+    /**
+     * Update a universe
+     * The universe object needs to contain a valid _id
+     *
+     * @param universe
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: the updated universe
+     */
+    updateUniverse: function(universe, callback) {
+        request.put(this.serverUrl + '/api/v1/universes/' + universe._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+            body: universe,
+            json: true
+        }, responseWrapper(callback));
     },
 
     /**
