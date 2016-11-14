@@ -9,9 +9,10 @@ function getComparableLayer(layer) {
     var comparableLayer = _.pick(layer, ['owner', 'venueId', 'name', 'alias', 'floor', 'isPublished']);
     _.defaults(comparableLayer, {
         alias: layer.name.replace(/\W+/g, '_').toLowerCase(),
-        isPublished: false
+        isPublished: false,
+        universes: []
     });
-    comparableLayer.universes = _.zipObject(layer.universes, _.times(layer.universes.length, _.constant(true)));
+    comparableLayer.universes = _.zipObject(comparableLayer.universes, _.times(comparableLayer.universes.length, _.constant(true)));
     return comparableLayer;
 };
 
@@ -25,9 +26,10 @@ function getComparablePlace(place) {
         isVisible: true,
         isClickable: true,
         style: {},
-        data: {}
+        data: {},
+        universes: []
     });
-    comparablePlace.universes = _.zipObject(place.universes, _.times(place.universes.length, _.constant(true)));
+    comparablePlace.universes = _.zipObject(comparablePlace.universes, _.times(comparablePlace.universes.length, _.constant(true)));
     comparablePlace.translations = _.keyBy(_.map(place.translations, function (translation) {    //Makes the translations comparable by removing the order in the array and the _id field
         return _.omit(translation, ['_id']);
     }), 'language');
@@ -40,9 +42,10 @@ function getComparablePlaceList(placeList) {
         alias: placeList.name.replace(/\W+/g, '_').toLowerCase(),
         isPublished: false,
         isSearchable: true,
-        data: {}
+        data: {},
+        universes: []
     });
-    comparablePlaceList.universes = _.zipObject(placeList.universes, _.times(placeList.universes.length, _.constant(true)));
+    comparablePlaceList.universes = _.zipObject(comparablePlaceList.universes, _.times(comparablePlaceList.universes.length, _.constant(true)));
     comparablePlaceList.translations = _.keyBy(_.map(placeList.translations, function (translation) {    //Makes the translations comparable by removing the order in the array and the _id field
         return _.omit(translation, ['_id']);
     }), 'language');
@@ -95,6 +98,7 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
             // Compare the objects with similar names
             _.forEach(_.intersection(objectNames, serverObjectNames), function (name) {
                 objectsByName[name]._id = serverObjectsByName[name]._id; // We add the _id in the place if found
+                objectsByName[name]._syncAction = 'update';
                 if (!isEqualFunction(objectsByName[name], serverObjectsByName[name])) {
                     objectsToUpdate.push(objectsByName[name]);
                 }
@@ -102,11 +106,13 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
 
             // Add the objects that are not on the server
             _.forEach(_.difference(objectNames, serverObjectNames), function (name) {
+                objectsByName[name]._syncAction = 'create';
                 objectsToCreate.push(objectsByName[name]);
             });
 
             // Delete all the objects that are on the server but not in objects
             _.forEach(_.difference(serverObjectNames, objectNames), function (name) {
+                objectsByName[name]._syncAction = 'delete';
                 objectsToDelete.push(serverObjectsByName[name]);
             });
 
@@ -144,7 +150,6 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
             if (!options.dryRun) {
                 async.forEachLimit(objectsToCreate, 10, function (object, nextObject) {
                     MapwizeApiClient['create' + objectClassCapSingular](object, function (err, createdObject) {
-                        //console.log(response);
                         if (!err) {
                             object._id = createdObject._id;
                         }
@@ -163,9 +168,6 @@ function responseWrapper(callback, expectedStatusCode) {
         if (err) {
             callback(err);
         } else if ( (_.isFinite(expectedStatusCode) && response.statusCode == expectedStatusCode) || response.statusCode == 200) {
-            console.log(response.request.href);
-            //console.log(body);
-            console.log(typeof body);
             callback(null, body);
         } else {
             callback(new Error(JSON.stringify(body)));
@@ -272,6 +274,18 @@ MapwizeApi.prototype = {
      */
     getVenues: function (callback) {
         var url = this.serverUrl + '/api/v1/venues?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&isPublished=all';
+        request.get(url, {json: true}, responseWrapper(callback));
+    },
+
+    /**
+     * Get a venue by id
+     *
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the venue if signing in was successful
+     */
+    getVenue: function (venueId, callback) {
+        var url = this.serverUrl + '/api/v1/venues/' + venueId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, {json: true}, responseWrapper(callback));
     },
 
@@ -555,7 +569,7 @@ MapwizeApi.prototype = {
      *  content: the updated connector
      */
     updateConnector: function (connector, callback) {
-        request.put(this.serverUrl + '/api/v1/connectors/' + layer._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        request.put(this.serverUrl + '/api/v1/connectors/' + connector._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: connector,
             json: true
         }, responseWrapper(callback));
@@ -594,6 +608,62 @@ MapwizeApi.prototype = {
         request.post({
             url: this.serverUrl + '/api/v1/layers/' + layerId + '/image?api_key=' + this.apiKey + '&organizationId=' + this.organizationId,
             formData: formData
+        }, responseWrapper(callback));
+    },
+
+    /**
+     * Get all routeGraphs of a venue
+     *
+     * @param venueId
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the routeGraphs
+     */
+    getVenueRouteGraphs: function (venueId, callback) {
+        var url = this.serverUrl + '/api/v1/routegraphs?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
+        request.get(url, {json: true}, responseWrapper(callback));
+    },
+
+    /**
+     * Delete a routeGraph by id
+     *
+     * @param routeGraphId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    deleteRouteGraph: function (routeGraphId, callback) {
+        request.delete(this.serverUrl + '/api/v1/routegraphs/' + routeGraphId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    },
+
+    /**
+     * Create a routeGraph
+     * The venueId and the owner need to be specified in the routeGraphs object
+     *
+     * @param routeGraph
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: the created routeGraph
+     */
+    createRouteGraph: function (routeGraph, callback) {
+        request.post(this.serverUrl + '/api/v1/routegraphs?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+            body: routeGraph,
+            json: true
+        }, responseWrapper(callback));
+    },
+
+    /**
+     * Update a routeGraph
+     * The routeGraph object needs to contain a valid _id
+     *
+     * @param routeGraph
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: the updated routeGraph
+     */
+    updateRouteGraph: function (routeGraph, callback) {
+        request.put(this.serverUrl + '/api/v1/routegraphs/' + routeGraph._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+            body: routeGraph,
+            json: true
         }, responseWrapper(callback));
     },
 
