@@ -222,6 +222,63 @@ MapwizeApi.prototype = {
     },
 
     /**
+     * Get all accessGroups of organization
+     *
+     * @param callback
+     *  error : null or Error('message')
+     *  content : the list of access groups if signing in was successful
+     */
+    getAccessGroups: function (callback) {
+        var url = this.serverUrl + '/api/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, {json : true}, responseWrapper(callback));
+    },
+
+    /**
+     * Create an accessGroup
+     * The owner need to be specified in the accessGroup object
+     *
+     * @param accessGroups
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the created accessGroups
+     */
+    createAccessGroup : function(accessGroup, callback) {
+        var url = this.serverUrl + '/api/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.post(url, {
+            body : accessGroup,
+            json : true
+        }, responseWrapper(callback))
+    },
+
+    /**
+     * Get all api key of organization
+     *
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the list of universes if signing in was successful
+     */
+    getApiKeys : function (callback) {
+        var url = this.serverUrl + '/api/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, {json : true}, responseWrapper((callback)));
+    },
+
+    /**
+     * Create an api key
+     *
+     * @param apiKey
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the created accessGroups
+     */
+    createApiKey : function (apiKey, callback) {
+        var url = this.serverUrl + '/api/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.post(url, {
+            body : apiKey,
+            json : true
+        }, responseWrapper(callback))
+    },
+    
+    /**
      * Get all universes of organization
      *
      * @param callback
