@@ -521,6 +521,64 @@ MapwizeApi.prototype = {
     },
 
     /**
+     * Get all beacons of a venue (including the unpublished beacons)
+     *
+     * @param venueId
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the beacons
+     */
+    getVenueBeacons: function (venueId, callback) {
+        var url = this.serverUrl + '/api/v1/beacons?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
+        request.get(url, {json: true}, responseWrapper(callback));
+    },
+
+    /**
+     * Create a Beacon
+     * The venueId and the owner need to be specified in the beacon object
+     *
+     * @param beacon
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: the created beacon
+     */
+    createBeacon: function (beacon, callback) {
+        var url = this.serverUrl + '/api/v1/beacons?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
+        request.post(url, {
+            body : beacon,
+            json : true
+        }, responseWrapper(callback))
+    },
+
+    /**
+     * update a Beacon
+     *
+     * @param beacon
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: the updated beacon
+     */
+    updateBeacon: function (beacon, callback) {
+        var url = this.serverUrl + '/api/v1/beacons/' + beacon._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
+        request.put(url, {
+            body : beacon,
+            json : true
+        }, responseWrapper(callback))
+    },
+
+    /**
+     * Delete a Beacon
+     *
+     * @param beaconId
+     * @param callback
+     * the result callback called with one arguments
+     *  error: null or Error('message')
+     */
+    deleteBeacon : function (beaconId, callback) {
+        request.delete(this.serverUrl + '/api/v1/beacons/' + beaconId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    },
+    
+    /**
      * Get all layers of a venue (including the unpublished layers)
      *
      * @param venueId
