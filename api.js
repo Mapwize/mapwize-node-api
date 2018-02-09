@@ -64,6 +64,34 @@ function getComparableConnector(connector) {
     return comparableConnector;
 };
 
+function getComparableBeacon(beacon) {
+    var comparableBeacon = _.pick(beacon, ['name', 'owner', 'venueId', 'type', 'location', 'floor', 'isPublished', 'properties']);
+    _.defaults(beacon, {
+        isPublished : false,
+        properties : {}
+    })
+    return comparableBeacon;
+}
+
+function getComparableTemplate(template) {
+    var comparableTemplate = _.pick(template, ['name', 'owner', 'venueId', 'description', 'url', 'placeTypeId', 'isPublished', 'isSearchable', 'isVisible', 'isClickable', 'style', 'tags', 'searchKeywords', 'data']);
+    _.defaults(comparableTemplate, {
+        isPublished: false,
+        isSearchable: true,
+        isVisible: true,
+        isClickable: true,
+        style: {},
+        data: {},
+        universes: [],
+        tags : [],
+    });
+    comparableTemplate.universes = _.zipObject(comparableTemplate.universes, _.times(comparableTemplate.universes.length, _.constant(true)));
+    comparableTemplate.translations = _.keyBy(_.map(template.translations, function (translation) {    //Makes the translations comparable by removing the order in the array and the _id field
+        return _.omit(translation, ['_id']);
+    }), 'language');
+    return comparableTemplate;
+}
+
 function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlural, isEqualFunction, MapwizeApiClient, venueId, objects, options, callback) {
     var serverObjects;
     var objectsToUpdate = [];
@@ -577,6 +605,62 @@ MapwizeApi.prototype = {
     deleteBeacon : function (beaconId, callback) {
         request.delete(this.serverUrl + '/api/v1/beacons/' + beaconId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
+
+    /**
+     * Get all templates of a venue
+     *
+     * @param venueId
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the templates
+     */
+    getVenueTemplates : function (venueId, callback) {
+        var url = this.serverUrl + '/api/v1/placeTemplates?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
+        request.get(url, {json: true}, responseWrapper(callback));
+    },
+
+    /**
+     * Create a template
+     * The name, venueId and the owner need to be specified in the template object
+     *
+     * @param template
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: the created template
+     */
+    createTemplate : function (template, callback) {
+        request.post(this.serverUrl + '/api/v1/placeTemplates?api_key=' + this.apiKey, {
+            body: template,
+            json: true
+        }, responseWrapper(callback));
+    },
+
+    /**
+     * Update a template
+     * The template object needs to contain a valid _id
+     *
+     * @param template
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: the updated template
+     */
+    updateTemplate : function (template, callback) {
+        request.put(this.serverUrl + '/api/v1/placeTemplates/' + template._id + '?api_key=' + this.apiKey, {
+            body: template,
+            json: true
+        }, responseWrapper(callback));
+    },
+
+    /**
+     * Delete a template by id
+     *
+     * @param templateId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    deleteTemplate : function (templateId, callback) {
+        request.delete(this.serverUrl + '/api/v1/placeTemplates/' + templateId + '?api_key=' + this.apiKey, responseWrapper(callback, 204));
+    },
     
     /**
      * Get all layers of a venue (including the unpublished layers)
@@ -871,6 +955,34 @@ MapwizeApi.prototype = {
         //TODO
     },
 
+    /**
+     * Returns true if both beacons have equal content (_id excluded)
+     *
+     * @param beacon1
+     * @param beacon2
+     * @returns {boolean}
+     */
+    isBeaconEqual : function (beacon1, beacon2) {
+        return _.isEqual(getComparableBeacon(beacon1), getComparableBeacon(beacon2));
+    },
+
+    compareBeacon : function (beacon1, beacon2) {
+        //TODO
+    },
+
+    /**
+     * Returns true if both template have equal content (_id excluded)
+     * @param template1
+     * @param template2
+     * @return {boolean}
+     */
+    isTemplateEqual : function (template1, template2) {
+        return _.isEqual(getComparableTemplate(template1), getComparableTemplate(template2));
+    },
+
+    compareTemplate : function () {
+        //TODO
+    },
 
     /**
      * Create, update or delete all the layers on the server to match with the given list of objects.
@@ -934,6 +1046,38 @@ MapwizeApi.prototype = {
      */
     syncVenueConnectors: function (venueId, objects, options, callback) {
         syncVenueObjects('connector', 'Connector', 'Connectors', this.isConnectorEqual, this, venueId, objects, options, callback);
-    }
+    },
+
+    /**
+     * Create, update or delete all the beacons on the server to match with the given list of objects.
+     * The name parameter is used as index key.
+     *
+     * @param venueId
+     * @param objects list of beacons. All beacons need to contain the venueId and owner parameters
+     * @param options object with optional parameters
+     *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
+     *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    syncVenueBeacons: function (venueId, objects, options, callback) {
+        syncVenueObjects('beacons', 'Beacon', 'Beacons', this.isBeaconEqual, this, venueId, objects, options, callback)
+    },
+
+    /**
+     * Create, update or delete all the templates on the server to match with the given list of objects.
+     * The name parameter is used as index key.
+     *
+     * @param venueId
+     * @param objects list of templates. All connectors need to contain the venueId and owner parameters
+     * @param options object with optional parameters
+     *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
+     *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    syncVenueTemplates : function (venueId, objects, options, callback) {
+        syncVenueObjects('template', 'Template', 'Templates', this.isTemplateEqual, this, venueId, objects, options, callback);
+    },
 };
 
