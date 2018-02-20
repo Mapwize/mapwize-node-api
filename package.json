@@ -3,6 +3,7 @@
   "author": "Mapwize",
   "version": "0.1.0",
   "description": "Mapwize API for Node.js",
+  "main": "api.js",
   "dependencies": {
     "async": "^2.0.1",
     "lodash": "^4.14.0",
