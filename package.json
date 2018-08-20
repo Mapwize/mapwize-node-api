@@ -1,7 +1,7 @@
 {
   "name": "mapwize-node-api",
   "author": "Mapwize",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mapwize API for Node.js",
   "main": "api.js",
   "dependencies": {
