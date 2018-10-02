@@ -246,7 +246,7 @@ MapwizeApi.prototype = {
             password: password
         };
         //console.log(this.serverUrl + '/auth/signin');
-        request.post(this.serverUrl + '/auth/signin', {form: credentials, json: true}, responseWrapper(callback));
+        request.post(this.serverUrl + '/v1/auth/signin', {form: credentials, json: true}, responseWrapper(callback));
     },
 
     /**
