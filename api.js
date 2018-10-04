@@ -203,6 +203,8 @@ function responseWrapper(callback, expectedStatusCode) {
     };
 };
 
+
+
 /**
  * Create a MapwizeApi client
  *
@@ -229,6 +231,8 @@ function MapwizeApi(apiKey, organizationId, opts) {
     this.organizationId = organizationId;
 }
 
+
+
 MapwizeApi.prototype = {
 
     /**
@@ -240,6 +244,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the user object if signing in was successful
      */
+
     signIn: function (email, password, callback) {
         var credentials = {
             email: email,
@@ -285,6 +290,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the list of universes if signing in was successful
      */
+
     getApiKeys : function (callback) {
         var url = this.serverUrl + '/api/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, {json : true}, responseWrapper((callback)));
@@ -343,6 +349,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the updated universe
      */
+
     updateUniverse: function(universe, callback) {
         request.put(this.serverUrl + '/api/v1/universes/' + universe._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: universe,
@@ -1078,6 +1085,20 @@ MapwizeApi.prototype = {
      */
     syncVenueTemplates : function (venueId, objects, options, callback) {
         syncVenueObjects('template', 'Template', 'Templates', this.isTemplateEqual, this, venueId, objects, options, callback);
+    },
+
+    /**
+     * Retrieves a given place source
+     *
+     * @param venueId
+     * @param placeId
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     *  content: given place source
+     */
+    getPlaceSource: function(venueId, placeId, callback) {
+        var url = this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place/'+placeId+'?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, {json : true}, responseWrapper(callback));
     },
 };
 
