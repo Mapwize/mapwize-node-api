@@ -1086,19 +1086,64 @@ MapwizeApi.prototype = {
     syncVenueTemplates : function (venueId, objects, options, callback) {
         syncVenueObjects('template', 'Template', 'Templates', this.isTemplateEqual, this, venueId, objects, options, callback);
     },
+    
+    /**
+     * Creates a place source
+     *
+     * @param venueId 
+     * @param namePlaceSource
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     */
+    createPlaceSource : function(venueId, namePlaceSource, callback) {
+        var url = this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.post(url, {
+            body : {"name": namePlaceSource},
+            json : true
+        }, responseWrapper(callback))
+    },
 
     /**
      * Retrieves a given place source
      *
      * @param venueId
-     * @param placeId
+     * @param placeSourceId
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      *  content: given place source
      */
-    getPlaceSource: function(venueId, placeId, callback) {
-        var url = this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place/'+placeId+'?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, {json : true}, responseWrapper(callback));
+    getPlaceSource: function(venueId, placeSourceId, callback) {
+            var url = this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place/'+placeSourceId+'?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+            request.get(url, {json : true}, responseWrapper(callback));
     },
+
+    /**
+     * Update a place source name
+     *
+     * @param venueId
+     * @param placeSourceId
+     * @param namePlaceSource
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     */
+    updatePlaceSourceName: function(venueId, placeSourceId, namePlaceSource, callback) {
+        request.put(this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place/'+placeSourceId+'?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+            body: {"name": namePlaceSource},
+            json: true
+        }, responseWrapper(callback));
+    },
+    
+    /**
+     * Delete a place source
+     *
+     * @param venueId
+     * @param placeSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    deletePlaceSource: function (venueId, placeSourceId, callback) {
+        request.delete(this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place/'+placeSourceId+'?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    },
+
 };
 
