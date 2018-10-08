@@ -1,5 +1,5 @@
 var request = require('request');
-request = request.defaults({jar: true});
+request = request.defaults({ jar: true });
 var _ = require('lodash');
 var async = require('async');
 
@@ -67,8 +67,8 @@ function getComparableConnector(connector) {
 function getComparableBeacon(beacon) {
     var comparableBeacon = _.pick(beacon, ['name', 'owner', 'venueId', 'type', 'location', 'floor', 'isPublished', 'properties']);
     _.defaults(beacon, {
-        isPublished : false,
-        properties : {}
+        isPublished: false,
+        properties: {}
     })
     return comparableBeacon;
 }
@@ -83,7 +83,7 @@ function getComparableTemplate(template) {
         style: {},
         data: {},
         universes: [],
-        tags : [],
+        tags: [],
     });
     comparableTemplate.universes = _.zipObject(comparableTemplate.universes, _.times(comparableTemplate.universes.length, _.constant(true)));
     comparableTemplate.translations = _.keyBy(_.map(template.translations, function (translation) {    //Makes the translations comparable by removing the order in the array and the _id field
@@ -192,10 +192,10 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
 };
 
 function responseWrapper(callback, expectedStatusCode) {
-    return function(err, response, body) {
+    return function (err, response, body) {
         if (err) {
             callback(err);
-        } else if ( (_.isFinite(expectedStatusCode) && response.statusCode == expectedStatusCode) || response.statusCode == 200) {
+        } else if ((_.isFinite(expectedStatusCode) && response.statusCode == expectedStatusCode) || response.statusCode == 200) {
             callback(null, body);
         } else {
             callback(new Error(JSON.stringify(body)));
@@ -211,7 +211,7 @@ function responseWrapper(callback, expectedStatusCode) {
  * @param apiKey the Mapwize API key to use. API keys can be found in the Mapwize admin interface under the Application menu
  * @param organizationId the id of your organization. For now, the use of the API is limited to your organization.
  * @param opts an object with optional parameters
- *  serverUrl the server url to use. Default to production server at https://api.mapwize.io
+ *  serverUrl the server url to use. Default to production server at https://www.mapwize.io
  * @constructor
  */
 function MapwizeApi(apiKey, organizationId, opts) {
@@ -231,8 +231,6 @@ function MapwizeApi(apiKey, organizationId, opts) {
     this.organizationId = organizationId;
 }
 
-
-
 MapwizeApi.prototype = {
 
     /**
@@ -251,7 +249,7 @@ MapwizeApi.prototype = {
             password: password
         };
         //console.log(this.serverUrl + '/auth/signin');
-        request.post(this.serverUrl + '/v1/auth/signin?api_key=' + this.apiKey, {form: credentials, json: true}, responseWrapper(callback));
+        request.post(this.serverUrl + '/v1/auth/signin?api_key=' + this.apiKey, { form: credentials, json: true }, responseWrapper(callback));
     },
 
     /**
@@ -263,7 +261,7 @@ MapwizeApi.prototype = {
      */
     getAccessGroups: function (callback) {
         var url = this.serverUrl + '/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, {json : true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -275,11 +273,11 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the created accessGroups
      */
-    createAccessGroup : function(accessGroup, callback) {
+    createAccessGroup: function (accessGroup, callback) {
         var url = this.serverUrl + '/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.post(url, {
-            body : accessGroup,
-            json : true
+            body: accessGroup,
+            json: true
         }, responseWrapper(callback))
     },
 
@@ -291,9 +289,9 @@ MapwizeApi.prototype = {
      *  content: the list of universes if signing in was successful
      */
 
-    getApiKeys : function (callback) {
+    getApiKeys: function (callback) {
         var url = this.serverUrl + '/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, {json : true}, responseWrapper((callback)));
+        request.get(url, { json: true }, responseWrapper((callback)));
     },
 
     /**
@@ -304,14 +302,14 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the created accessGroups
      */
-    createApiKey : function (apiKey, callback) {
+    createApiKey: function (apiKey, callback) {
         var url = this.serverUrl + '/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.post(url, {
-            body : apiKey,
-            json : true
+            body: apiKey,
+            json: true
         }, responseWrapper(callback))
     },
-    
+
     /**
      * Get all universes of organization
      *
@@ -321,7 +319,7 @@ MapwizeApi.prototype = {
      */
     getUniverses: function (callback) {
         var url = this.serverUrl + '/v1/universes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -333,7 +331,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the created universe
      */
-    createUniverse: function(universe, callback) {
+    createUniverse: function (universe, callback) {
         request.post(this.serverUrl + '/v1/universes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: universe,
             json: true
@@ -350,7 +348,7 @@ MapwizeApi.prototype = {
      *  content: the updated universe
      */
 
-    updateUniverse: function(universe, callback) {
+    updateUniverse: function (universe, callback) {
         request.put(this.serverUrl + '/v1/universes/' + universe._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: universe,
             json: true
@@ -366,7 +364,7 @@ MapwizeApi.prototype = {
      */
     getVenues: function (callback) {
         var url = this.serverUrl + '/v1/venues?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&isPublished=all';
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -378,7 +376,7 @@ MapwizeApi.prototype = {
      */
     getVenue: function (venueId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -390,7 +388,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the created venue
      */
-    createVenue: function(venue, callback) {
+    createVenue: function (venue, callback) {
         request.post(this.serverUrl + '/v1/venues?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: venue,
             json: true
@@ -406,7 +404,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the updated venue
      */
-    updateVenue: function(venue, callback) {
+    updateVenue: function (venue, callback) {
         request.put(this.serverUrl + '/v1/venues/' + venue._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: venue,
             json: true
@@ -436,7 +434,7 @@ MapwizeApi.prototype = {
                 page++;
 
                 var url = self.serverUrl + '/v1/places?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&isPublished=all&page=' + page;
-                request.get(url, {json: true}, function (err, response, body) {
+                request.get(url, { json: true }, function (err, response, body) {
                     var serverPlacesPage = [];
                     if (!err && response.statusCode == 200) {
                         serverPlacesPage = body;
@@ -509,7 +507,7 @@ MapwizeApi.prototype = {
      */
     getVenuePlaceLists: function (venueId, callback) {
         var url = this.serverUrl + '/v1/placeLists?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -565,7 +563,7 @@ MapwizeApi.prototype = {
      */
     getVenueBeacons: function (venueId, callback) {
         var url = this.serverUrl + '/v1/beacons?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -580,8 +578,8 @@ MapwizeApi.prototype = {
     createBeacon: function (beacon, callback) {
         var url = this.serverUrl + '/v1/beacons?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
         request.post(url, {
-            body : beacon,
-            json : true
+            body: beacon,
+            json: true
         }, responseWrapper(callback))
     },
 
@@ -596,8 +594,8 @@ MapwizeApi.prototype = {
     updateBeacon: function (beacon, callback) {
         var url = this.serverUrl + '/v1/beacons/' + beacon._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
         request.put(url, {
-            body : beacon,
-            json : true
+            body: beacon,
+            json: true
         }, responseWrapper(callback))
     },
 
@@ -609,7 +607,7 @@ MapwizeApi.prototype = {
      * the result callback called with one arguments
      *  error: null or Error('message')
      */
-    deleteBeacon : function (beaconId, callback) {
+    deleteBeacon: function (beaconId, callback) {
         request.delete(this.serverUrl + '/v1/beacons/' + beaconId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
@@ -621,9 +619,9 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the templates
      */
-    getVenueTemplates : function (venueId, callback) {
+    getVenueTemplates: function (venueId, callback) {
         var url = this.serverUrl + '/v1/placeTemplates?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -635,7 +633,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the created template
      */
-    createTemplate : function (template, callback) {
+    createTemplate: function (template, callback) {
         request.post(this.serverUrl + '/v1/placeTemplates?api_key=' + this.apiKey, {
             body: template,
             json: true
@@ -651,7 +649,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: the updated template
      */
-    updateTemplate : function (template, callback) {
+    updateTemplate: function (template, callback) {
         request.put(this.serverUrl + '/v1/placeTemplates/' + template._id + '?api_key=' + this.apiKey, {
             body: template,
             json: true
@@ -665,10 +663,10 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-    deleteTemplate : function (templateId, callback) {
+    deleteTemplate: function (templateId, callback) {
         request.delete(this.serverUrl + '/v1/placeTemplates/' + templateId + '?api_key=' + this.apiKey, responseWrapper(callback, 204));
     },
-    
+
     /**
      * Get all layers of a venue (including the unpublished layers)
      *
@@ -679,7 +677,7 @@ MapwizeApi.prototype = {
      */
     getVenueLayers: function (venueId, callback) {
         var url = this.serverUrl + '/v1/layers?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -735,7 +733,7 @@ MapwizeApi.prototype = {
      */
     getVenueConnectors: function (venueId, callback) {
         var url = this.serverUrl + '/v1/connectors?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -797,10 +795,10 @@ MapwizeApi.prototype = {
         var formData = {
             importJob: JSON.stringify({
                 corners: [
-                    {lat: topLeft.latitude, lng: topLeft.longitude},
-                    {lat: topRight.latitude, lng: topRight.longitude},
-                    {lat: bottomLeft.latitude, lng: bottomLeft.longitude},
-                    {lat: bottomRight.latitude, lng: bottomRight.longitude},
+                    { lat: topLeft.latitude, lng: topLeft.longitude },
+                    { lat: topRight.latitude, lng: topRight.longitude },
+                    { lat: bottomLeft.latitude, lng: bottomLeft.longitude },
+                    { lat: bottomRight.latitude, lng: bottomRight.longitude },
                 ]
             }),
             file: {
@@ -827,7 +825,7 @@ MapwizeApi.prototype = {
      */
     getVenueRouteGraphs: function (venueId, callback) {
         var url = this.serverUrl + '/v1/routegraphs?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        request.get(url, {json: true}, responseWrapper(callback));
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -969,11 +967,11 @@ MapwizeApi.prototype = {
      * @param beacon2
      * @returns {boolean}
      */
-    isBeaconEqual : function (beacon1, beacon2) {
+    isBeaconEqual: function (beacon1, beacon2) {
         return _.isEqual(getComparableBeacon(beacon1), getComparableBeacon(beacon2));
     },
 
-    compareBeacon : function (beacon1, beacon2) {
+    compareBeacon: function (beacon1, beacon2) {
         //TODO
     },
 
@@ -983,11 +981,11 @@ MapwizeApi.prototype = {
      * @param template2
      * @return {boolean}
      */
-    isTemplateEqual : function (template1, template2) {
+    isTemplateEqual: function (template1, template2) {
         return _.isEqual(getComparableTemplate(template1), getComparableTemplate(template2));
     },
 
-    compareTemplate : function () {
+    compareTemplate: function () {
         //TODO
     },
 
@@ -1083,10 +1081,10 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-    syncVenueTemplates : function (venueId, objects, options, callback) {
+    syncVenueTemplates: function (venueId, objects, options, callback) {
         syncVenueObjects('template', 'Template', 'Templates', this.isTemplateEqual, this, venueId, objects, options, callback);
     },
-    
+
     /**
      * Creates a place source
      *
@@ -1095,11 +1093,11 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      */
-    createPlaceSource : function(venueId, namePlaceSource, callback) {
-        var url = this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+    createPlaceSource: function (venueId, namePlaceSource, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.post(url, {
-            body : {"name": namePlaceSource},
-            json : true
+            body: { "name": namePlaceSource },
+            json: true
         }, responseWrapper(callback))
     },
 
@@ -1112,9 +1110,9 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: given place source
      */
-    getPlaceSource: function(venueId, placeSourceId, callback) {
-            var url = this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place/'+placeSourceId+'?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-            request.get(url, {json : true}, responseWrapper(callback));
+    getPlaceSource: function (venueId, placeSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1126,13 +1124,13 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      */
-    updatePlaceSourceName: function(venueId, placeSourceId, namePlaceSource, callback) {
-        request.put(this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place/'+placeSourceId+'?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: {"name": namePlaceSource},
+    updatePlaceSourceName: function (venueId, placeSourceId, namePlaceSource, callback) {
+        request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+            body: { "name": namePlaceSource },
             json: true
         }, responseWrapper(callback));
     },
-    
+
     /**
      * Delete a place source
      *
@@ -1142,7 +1140,141 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deletePlaceSource: function (venueId, placeSourceId, callback) {
-        request.delete(this.serverUrl + '/api/v1/venues/'+venueId+'/sources/place/'+placeSourceId+'?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    },
+
+    /**
+     * Retrieves data associated to a given place source
+     * 
+     * @param venueId
+     * @param placeSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     *  content: data associated to a given place source
+     */
+
+    getPlaceSourceData: function (venueId, placeSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Edits data associated to a given place source
+     * 
+     * @param venueId
+     * @param placeSourceId
+     * @param data
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+
+    editPlaceSourceData: function (venueId, placeSourceId, data, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
+        request.post(url, { body: data, json: true }, responseWrapper(callback))
+    },
+
+    /**
+     * Launchs a setup job for a given place source
+     * 
+     * @param venueId
+     * @param placeSourceId
+     * @param callback the result callback called with one argument
+     * error: null or Error('message')
+     * returns the Job ID in the response {jobId: $jobId}
+     */
+
+    placeSourceSetup: function (venueId, placeSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.post(url, { json: true }, responseWrapper(callback))
+    },
+
+    /**
+     * Get a setup job for a given place source
+     * 
+     * @param venueId
+     * @param placeSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+
+    getPlaceSourceSetup: function (venueId, placeSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Retrieves the parameters extracted during the setup job
+     * 
+     * @param venueId
+     * @param placeSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+
+    getPlaceSourceParams: function (venueId, placeSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Retrieves the georeference and place configurations
+     * 
+     * @param venueId
+     * @param placeSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+
+    getPlaceSourceConfig: function (venueId, placeSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Edit the georeference and place configurations
+     * 
+     * @param venueId
+     * @param placeSourceId
+     * @param options places => [Object] & propertyForGeoreference => String
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+
+    editPlaceSourceConfig: function (venueId, placeSourceId, options, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.put(url, {
+            body: options,
+            json: true
+        }, responseWrapper(callback));
+    },
+
+    /**
+     * Launchs a run job for a given place source
+     * 
+     * @param venueId
+     * @param placeSourceId
+     * @param callback the result callback called with one argument
+     * error: null or Error('message')
+     * returns the Job ID in the response {jobId: $jobId}
+     */
+
+    placeSourceRun: function (venueId, placeSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.post(url, { json: true }, responseWrapper(callback))
+    },
+
+    /**
+    * Get a run job for a given place source
+    * 
+    * @param venueId
+    * @param placeSourceId
+    * @param callback the result callback called with one argument
+    *  error: null or Error('message')
+    */
+
+    getPlaceSourceRun: function (venueId, placeSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
     },
 
 };
