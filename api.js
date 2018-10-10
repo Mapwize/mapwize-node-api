@@ -1152,14 +1152,13 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      *  content: data associated to a given place source
      */
-
     getPlaceSourceData: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
         request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
-     * Edits data associated to a given place source
+     * Update data associated to a given place source
      * 
      * @param venueId
      * @param placeSourceId
@@ -1167,14 +1166,13 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-
-    editPlaceSourceData: function (venueId, placeSourceId, data, callback) {
+    updatePlaceSourceData: function (venueId, placeSourceId, data, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
         request.post(url, { body: data, json: true }, responseWrapper(callback))
     },
 
     /**
-     * Launchs a setup job for a given place source
+     * Launches a setup job for a given place source
      * 
      * @param venueId
      * @param placeSourceId
@@ -1182,8 +1180,7 @@ MapwizeApi.prototype = {
      * error: null or Error('message')
      * returns the Job ID in the response {jobId: $jobId}
      */
-
-    placeSourceSetup: function (venueId, placeSourceId, callback) {
+    runPlaceSourceSetupJob: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.post(url, { json: true }, responseWrapper(callback))
     },
@@ -1196,8 +1193,7 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-
-    getPlaceSourceSetup: function (venueId, placeSourceId, callback) {
+    getRunPlaceSourceSetupJob: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
@@ -1210,7 +1206,6 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-
     getPlaceSourceParams: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
@@ -1224,14 +1219,13 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-
     getPlaceSourceConfig: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
-     * Edit the georeference and place configurations
+     * Update the georeference and place configurations
      * 
      * @param venueId
      * @param placeSourceId
@@ -1239,8 +1233,7 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-
-    editPlaceSourceConfig: function (venueId, placeSourceId, options, callback) {
+    updatePlaceSourceConfig: function (venueId, placeSourceId, options, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.put(url, {
             body: options,
@@ -1249,7 +1242,7 @@ MapwizeApi.prototype = {
     },
 
     /**
-     * Launchs a run job for a given place source
+     * Launches a run job for a given place source
      * 
      * @param venueId
      * @param placeSourceId
@@ -1257,8 +1250,7 @@ MapwizeApi.prototype = {
      * error: null or Error('message')
      * returns the Job ID in the response {jobId: $jobId}
      */
-
-    placeSourceRun: function (venueId, placeSourceId, callback) {
+    runPlaceSourceJob: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.post(url, { json: true }, responseWrapper(callback))
     },
@@ -1271,11 +1263,9 @@ MapwizeApi.prototype = {
     * @param callback the result callback called with one argument
     *  error: null or Error('message')
     */
-
-    getPlaceSourceRun: function (venueId, placeSourceId, callback) {
+    getRunPlaceSourceJob: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
 
 };
-
