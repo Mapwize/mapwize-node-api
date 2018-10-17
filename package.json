@@ -4,6 +4,10 @@
   "version": "0.2.1",
   "description": "Mapwize API for Node.js",
   "main": "api.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Mapwize/mapwize-node-api"
+  },
   "dependencies": {
     "async": "^2.0.1",
     "lodash": "^4.14.0",
