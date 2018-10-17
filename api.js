@@ -211,7 +211,7 @@ function responseWrapper(callback, expectedStatusCode) {
  * @param apiKey the Mapwize API key to use. API keys can be found in the Mapwize admin interface under the Application menu
  * @param organizationId the id of your organization. For now, the use of the API is limited to your organization.
  * @param opts an object with optional parameters
- *  serverUrl the server url to use. Default to production server at https://www.mapwize.io
+ *  serverUrl the server url to use. Default to production server at https://www.api.mapwize.io
  * @constructor
  */
 function MapwizeApi(apiKey, organizationId, opts) {
