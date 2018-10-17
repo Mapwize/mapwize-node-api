@@ -140,7 +140,7 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
 
             // Delete all the objects that are on the server but not in objects
             _.forEach(_.difference(serverObjectNames, objectNames), function (name) {
-                objectsByName[name]._syncAction = 'delete';
+                serverObjectsByName[name]._syncAction = 'delete';
                 objectsToDelete.push(serverObjectsByName[name]);
             });
 
