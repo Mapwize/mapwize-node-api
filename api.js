@@ -31,7 +31,7 @@ function getComparablePlace(place) {
     });
     comparablePlace.universes = _.zipObject(comparablePlace.universes, _.times(comparablePlace.universes.length, _.constant(true)));
     comparablePlace.translations = _.keyBy(_.map(place.translations, function (translation) {    //Makes the translations comparable by removing the order in the array and the _id field
-        return _.omit(translation, ['_id']);
+        return _.omit(translation, ['_id', 'hasDetails']);
     }), 'language');
     return comparablePlace;
 };
