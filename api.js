@@ -188,7 +188,9 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                 next();
             }
         }
-    ], callback);
+    ], function (err) {
+        callback(err, [serverObjects,objectsToCreate,objectsToDelete,objectsToUpdate]);
+    });
 };
 
 function responseWrapper(callback, expectedStatusCode) {
@@ -998,7 +1000,7 @@ MapwizeApi.prototype = {
      * @param options object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the result callback called with one argument
+     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
      *  error: null or Error('message')
      */
     syncVenueLayers: function (venueId, objects, options, callback) {
@@ -1014,7 +1016,7 @@ MapwizeApi.prototype = {
      * @param options object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the result callback called with one argument
+     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
      *  error: null or Error('message')
      */
     syncVenuePlaces: function (venueId, objects, options, callback) {
@@ -1030,7 +1032,7 @@ MapwizeApi.prototype = {
      * @param options object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the result callback called with one argument
+     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
      *  error: null or Error('message')
      */
     syncVenuePlaceLists: function (venueId, objects, options, callback) {
@@ -1046,7 +1048,7 @@ MapwizeApi.prototype = {
      * @param options object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the result callback called with one argument
+     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
      *  error: null or Error('message')
      */
     syncVenueConnectors: function (venueId, objects, options, callback) {
@@ -1062,7 +1064,7 @@ MapwizeApi.prototype = {
      * @param options object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the result callback called with one argument
+     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
      *  error: null or Error('message')
      */
     syncVenueBeacons: function (venueId, objects, options, callback) {
@@ -1078,7 +1080,7 @@ MapwizeApi.prototype = {
      * @param options object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the result callback called with one argument
+     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
      *  error: null or Error('message')
      */
     syncVenueTemplates: function (venueId, objects, options, callback) {
