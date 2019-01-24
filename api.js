@@ -1269,21 +1269,21 @@ MapwizeApi.prototype = {
     },
     
     /**
-     * Retrieves data associated to a given place source
+     * Retrieves data associated to a given Autocad source
      * 
      * @param venueId
      * @param autocadSourceId
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
-     *  content: data associated to a given place source
+     *  content: data associated to a given Autocad source
      */
-    getAutocadSourceData: function (venueId, autocadSourceId, callback) {
+    getAutocadSourceConfig: function (venueId, autocadSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
-     * Update data associated to a given place source
+     * Update data associated to a given Autocad source
      * 
      * @param venueId
      * @param autocadSourceId
@@ -1291,7 +1291,7 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-    updateAutocadSourceData: function (venueId, autocadSourceId, data, callback) {
+    updateAutocadSourceConfig: function (venueId, autocadSourceId, data, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
         request.put(url, { body: data, json: true }, responseWrapper(callback))
     },
