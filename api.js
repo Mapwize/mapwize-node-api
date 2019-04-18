@@ -108,8 +108,10 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                     } else {
                         serverObjects = allServerObjects;
                     }
+                    next();
+                } else {
+                    next('Couldn\'t retrieve venue');
                 }
-                next('Couldn\'t retrieve venue.');
             });
         },
         function (next) {
@@ -165,8 +167,10 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                         if (!err) {
                             console.log(cmpt + "/" + objectsToDelete.length)
                             cmpt++;
+                            nextObject();
+                        } else {
+                            nextObject("Couldn't delete the place");
                         }
-                        nextObject("Couldn't delete the place")
                     });
                 }, next);
             } else {
@@ -185,8 +189,10 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                         if (!err) {
                             console.log(cmpt + "/" + objectsToUpdate.length)
                             cmpt++;
+                            nextObject();
+                        } else {
+                            nextObject("Couldn't update the place");
                         }
-                        nextObject("Couldn't update the place")
                     });
                 }, next);
             } else {
@@ -206,8 +212,10 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                             object._id = createdObject._id;
                             console.log(cmpt + "/" + objectsToCreate.length)
                             cmpt++;
+                            nextObject();
+                        } else {
+                            nextObject("Couldn't create the place");
                         }
-                        nextObject("Couldn't create the place");
                     });
                 }, next);
             } else {
