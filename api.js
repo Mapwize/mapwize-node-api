@@ -108,9 +108,8 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                     } else {
                         serverObjects = allServerObjects;
                     }
-                    next();
                 }
-                    next('Couldn\'t retrieve venue.');
+                next('Couldn\'t retrieve venue.');
             });
         },
         function (next) {
@@ -166,9 +165,8 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                         if (!err) {
                             console.log(cmpt + "/" + objectsToDelete.length)
                             cmpt++;
-                            next();
                         }
-                            nextObject("Couldn't delete the place")
+                        nextObject("Couldn't delete the place")
                     });
                 }, next);
             } else {
