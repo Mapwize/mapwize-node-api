@@ -108,8 +108,9 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                     } else {
                         serverObjects = allServerObjects;
                     }
+                    next();
                 }
-                next(err);
+                    next('Couldn\'t retrieve venue.');
             });
         },
         function (next) {
@@ -165,8 +166,9 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                         if (!err) {
                             console.log(cmpt + "/" + objectsToDelete.length)
                             cmpt++;
+                            next();
                         }
-                        nextObject(err)
+                            nextObject("Couldn't delete the place")
                     });
                 }, next);
             } else {
@@ -186,7 +188,7 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                             console.log(cmpt + "/" + objectsToUpdate.length)
                             cmpt++;
                         }
-                        nextObject(err)
+                        nextObject("Couldn't update the place")
                     });
                 }, next);
             } else {
@@ -207,7 +209,7 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                             console.log(cmpt + "/" + objectsToCreate.length)
                             cmpt++;
                         }
-                        nextObject(err);
+                        nextObject("Couldn't create the place");
                     });
                 }, next);
             } else {
@@ -215,7 +217,7 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
             }
         }
     ], function (err) {
-        callback(err, [serverObjects,objectsToCreate,objectsToDelete,objectsToUpdate]);
+        callback(err, [serverObjects, objectsToCreate, objectsToDelete, objectsToUpdate]);
     });
 };
 
@@ -1295,7 +1297,7 @@ MapwizeApi.prototype = {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
-    
+
     /**
      * Retrieves data associated to a given Autocad source
      * 
@@ -1323,5 +1325,4 @@ MapwizeApi.prototype = {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
         request.put(url, { body: data, json: true }, responseWrapper(callback))
     },
-
 };
