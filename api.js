@@ -156,8 +156,18 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
         function (next) {
             // Delete objects
             if (!options.dryRun) {
+                if (objectsToDelete.length != 0) {
+                    var cmpt = 1;
+                    console.log("\ndelete:")
+                }
                 async.forEachLimit(objectsToDelete, 10, function (object, nextObject) {
-                    MapwizeApiClient['delete' + objectClassCapSingular](object._id, nextObject);
+                    MapwizeApiClient['delete' + objectClassCapSingular](object._id, function (err) {
+                        if (!err) {
+                            console.log(cmpt + "/" + objectsToDelete.length)
+                            cmpt++;
+                        }
+                        nextObject(err)
+                    });
                 }, next);
             } else {
                 next();
@@ -166,8 +176,18 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
         function (next) {
             // Update objects
             if (!options.dryRun) {
+                if (objectsToUpdate.length != 0) {
+                    var cmpt = 1;
+                    console.log("\nupdate:")
+                }
                 async.forEachLimit(objectsToUpdate, 10, function (object, nextObject) {
-                    MapwizeApiClient['update' + objectClassCapSingular](object, nextObject);
+                    MapwizeApiClient['update' + objectClassCapSingular](object, function (err) {
+                        if (!err) {
+                            console.log(cmpt + "/" + objectsToUpdate.length)
+                            cmpt++;
+                        }
+                        nextObject(err)
+                    });
                 }, next);
             } else {
                 next();
@@ -176,10 +196,16 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
         function (next) {
             // Create objects
             if (!options.dryRun) {
+                if (objectsToCreate.length != 0) {
+                    var cmpt = 1;
+                    console.log("\ncreate:")
+                }
                 async.forEachLimit(objectsToCreate, 10, function (object, nextObject) {
                     MapwizeApiClient['create' + objectClassCapSingular](object, function (err, createdObject) {
                         if (!err) {
                             object._id = createdObject._id;
+                            console.log(cmpt + "/" + objectsToCreate.length)
+                            cmpt++;
                         }
                         nextObject(err);
                     });
