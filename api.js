@@ -117,13 +117,17 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
         function (next) {
             // Comparing all the objects to know which ones to create/update/delete
 
+            // Remove spaces in end name of object if exist
+            _.forEach(objects, function (data) {
+                data.name = data.name.trimRight();
+            })
+
             // Creating maps by name as the matching is done on the name
             objectsByName = _.keyBy(objects, 'name');
             serverObjectsByName = _.keyBy(serverObjects, 'name');
 
             objectNames = _.map(objects, 'name');
             serverObjectNames = _.map(serverObjects, 'name');
-
 
             // Compare the objects with similar names
             _.forEach(_.intersection(objectNames, serverObjectNames), function (name) {
