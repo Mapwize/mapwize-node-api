@@ -110,16 +110,18 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                     }
                     next();
                 } else {
-                    next('Couldn\'t retrieve venue');
+                    next('Cannot retrieve the ' + objectClassCapPlural.toLowerCase() + ' of the given venue');
                 }
             });
         },
         function (next) {
             // Comparing all the objects to know which ones to create/update/delete
 
-            // Remove spaces in end name of object if exist
+            // Remove spaces in begin and end name of object if exist
             _.forEach(objects, function (data) {
-                data.name = data.name.trimRight();
+                if (data.hasOwnProperty('name')) {
+                    data.name = data.name.trim();
+                }
             })
 
             // Creating maps by name as the matching is done on the name
@@ -164,19 +166,26 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
             if (!options.dryRun) {
                 if (objectsToDelete.length != 0) {
                     var cmpt = 1;
-                    console.log("\ndelete:")
+                    console.log('\ndelete:')
                 }
+                var errors = [];
                 async.forEachLimit(objectsToDelete, 10, function (object, nextObject) {
                     MapwizeApiClient['delete' + objectClassCapSingular](object._id, function (err) {
                         if (!err) {
-                            console.log(cmpt + "/" + objectsToDelete.length)
+                            console.log(cmpt + '/' + objectsToDelete.length)
                             cmpt++;
                             nextObject();
                         } else {
-                            nextObject("Couldn't delete the place");
+                            errors.push('Couldn\'t delete the place ' + object._id + ', ERR: ' + JSON.parse(err.message).message + '.' || 'undefined' + '.')
+                            nextObject();
                         }
                     });
-                }, next);
+                }, function (err) {
+                    _.forEach(errors, function (msg) {
+                        console.log(msg)
+                    })
+                    next(err);
+                });
             } else {
                 next();
             }
@@ -186,42 +195,61 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
             if (!options.dryRun) {
                 if (objectsToUpdate.length != 0) {
                     var cmpt = 1;
-                    console.log("\nupdate:")
+                    console.log('\nupdate:')
                 }
+                var errors = [];
                 async.forEachLimit(objectsToUpdate, 10, function (object, nextObject) {
                     MapwizeApiClient['update' + objectClassCapSingular](object, function (err) {
                         if (!err) {
-                            console.log(cmpt + "/" + objectsToUpdate.length)
+                            console.log(cmpt + '/' + objectsToUpdate.length)
                             cmpt++;
                             nextObject();
                         } else {
-                            nextObject("Couldn't update the place");
+                            errors.push('Couldn\'t update the place ' + object._id + ', ERR: ' + JSON.parse(err.message).message + '.' || 'undefined' + '.')
+                            nextObject();
                         }
                     });
-                }, next);
+                }, function (err) {
+                    _.forEach(errors, function (msg) {
+                        console.log(msg)
+                    })
+                    next(err);
+                });
             } else {
                 next();
             }
         },
+
         function (next) {
             // Create objects
             if (!options.dryRun) {
                 if (objectsToCreate.length != 0) {
                     var cmpt = 1;
-                    console.log("\ncreate:")
+                    console.log('\ncreate:')
                 }
+                var errors = [];
                 async.forEachLimit(objectsToCreate, 10, function (object, nextObject) {
                     MapwizeApiClient['create' + objectClassCapSingular](object, function (err, createdObject) {
                         if (!err) {
                             object._id = createdObject._id;
-                            console.log(cmpt + "/" + objectsToCreate.length)
+                            console.log(cmpt + '/' + objectsToCreate.length)
                             cmpt++;
                             nextObject();
                         } else {
-                            nextObject("Couldn't create the place");
+                            if (object.hasOwnProperty('name')) {
+                                errors.push('Couldn\'t create the place ' + object.name + ', ERR: ' + JSON.parse(err.message).message + '.' || 'undefined' + '.')
+                            } else {
+                                errors.push('The object could not be created, ERR: ' + JSON.parse(err.message).message + '.' || 'undefined' + '.')
+                            }
+                            nextObject();
                         }
                     });
-                }, next);
+                }, function (err) {
+                    _.forEach(errors, function (msg) {
+                        console.log(msg)
+                    })
+                    next(err);
+                });
             } else {
                 next();
             }
@@ -1136,7 +1164,7 @@ MapwizeApi.prototype = {
     createPlaceSource: function (venueId, namePlaceSource, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.post(url, {
-            body: { "name": namePlaceSource },
+            body: { 'name': namePlaceSource },
             json: true
         }, responseWrapper(callback))
     },
@@ -1166,7 +1194,7 @@ MapwizeApi.prototype = {
      */
     updatePlaceSourceName: function (venueId, placeSourceId, namePlaceSource, callback) {
         request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: { "name": namePlaceSource },
+            body: { 'name': namePlaceSource },
             json: true
         }, responseWrapper(callback));
     },
