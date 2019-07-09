@@ -6,7 +6,7 @@ var async = require('async');
 module.exports = MapwizeApi;
 
 function getComparableLayer(layer) {
-    var comparableLayer = _.pick(layer, ['owner', 'venueId', 'name', 'alias', 'floor', 'isPublished']);
+    var comparableLayer = _.pick(layer, ['owner', 'venueId', 'name', 'alias', 'floor', 'isPublished', 'universes']);
     _.defaults(comparableLayer, {
         alias: layer.name.replace(/\W+/g, '_').toLowerCase(),
         isPublished: false,
@@ -17,7 +17,7 @@ function getComparableLayer(layer) {
 };
 
 function getComparablePlace(place) {
-    var comparablePlace = _.pick(place, ['owner', 'venueId', 'placeTypeId', 'name', 'alias', 'floor', 'geometry', 'marker', 'entrance', 'order', 'isPublished', 'isSearchable', 'isVisible', 'isClickable', 'style', 'data']);
+    var comparablePlace = _.pick(place, ['owner', 'venueId', 'placeTypeId', 'name', 'alias', 'floor', 'geometry', 'marker', 'entrance', 'order', 'isPublished', 'isSearchable', 'isVisible', 'isClickable', 'style', 'data', 'universes']);
     _.defaults(comparablePlace, {
         alias: place.name.replace(/\W+/g, '_').toLowerCase(),
         order: 0,
@@ -37,7 +37,7 @@ function getComparablePlace(place) {
 };
 
 function getComparablePlaceList(placeList) {
-    var comparablePlaceList = _.pick(placeList, ['owner', 'venueId', 'name', 'alias', 'placeIds', 'isPublished', 'isSearchable', 'data', 'icon']);
+    var comparablePlaceList = _.pick(placeList, ['owner', 'venueId', 'name', 'alias', 'placeIds', 'isPublished', 'isSearchable', 'data', 'icon', 'universes']);
     _.defaults(comparablePlaceList, {
         alias: placeList.name.replace(/\W+/g, '_').toLowerCase(),
         isPublished: false,
