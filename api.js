@@ -1340,7 +1340,7 @@ MapwizeApi.prototype = {
     },
 
     /**
-     * Update a raster source name
+     * Update a raster source
      *
      * @param venueId
      * @param rasterSourceId
@@ -1348,7 +1348,7 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      */
-    updateRasterSourceName: function (venueId, rasterSourceId, object, callback) {
+    updateRasterSource: function (venueId, rasterSourceId, object, callback) {
         request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: object,
             json: true
@@ -1363,12 +1363,12 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-    deletePlaceSource: function (venueId, rasterSourceId, callback) {
+    deleteRasterSource: function (venueId, rasterSourceId, callback) {
         request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
-     * Retrieves a PNG image to a given raster source
+     * Retrieves the PNG image of the raster source
      *
      * @param venueId
      * @param rasterSourceId
@@ -1411,7 +1411,7 @@ MapwizeApi.prototype = {
     },
 
     /**
-     * Get a setup job for a given raster source
+     * Gets the status of the setup job for a given raster source
      * 
      * @param venueId
      * @param rasterSourceId
@@ -1431,7 +1431,7 @@ MapwizeApi.prototype = {
     * @param callback the result callback called with one argument
     *  error: null or Error('message')
     */
-    getRasterPngPreview: function (venueId, rasterSourceId, callback) {
+    getRasterSourcePreviewPng: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/previewPNG?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
@@ -1444,7 +1444,7 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-    getRunRasterSourceParams: function (venueId, rasterSourceId, callback) {
+    getRasterSourceParams: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
@@ -1457,23 +1457,23 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-    getRunRasterSourceConfig: function (venueId, rasterSourceId, callback) {
+    getRasterSourceConfig: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
-     * Update a raster source configuration
+     * Update the raster source configuration
      *
      * @param venueId
      * @param rasterSourceId
-     * @param object
+     * @param config
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      */
-    updateRasterSourceConfig: function (venueId, rasterSourceId, object, callback) {
+    updateRasterSourceConfig: function (venueId, rasterSourceId, config, callback) {
         request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: object,
+            body: config,
             json: true
         }, responseWrapper(callback));
     },
@@ -1493,7 +1493,7 @@ MapwizeApi.prototype = {
     },
 
     /**
-    * Get a run job for a given raster source
+    * Get the status of the run job for a given raster source
     * 
     * @param venueId
     * @param rasterSourceId
