@@ -1344,13 +1344,13 @@ MapwizeApi.prototype = {
      *
      * @param venueId
      * @param rasterSourceId
-     * @param nameRasterSource
+     * @param rasterSourceName
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      */
-    updateRasterSourceName: function (venueId, rasterSourceId, nameRasterSource, callback) {
+    updateRasterSourceName: function (venueId, rasterSourceId, rasterSourceName, callback) {
         request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: { "name": nameRasterSource },
+            body: { "name": rasterSourceName },
             json: true
         }, responseWrapper(callback));
     },
@@ -1377,6 +1377,23 @@ MapwizeApi.prototype = {
      */
     getRasterSourcePng: function (venueId, rasterSourceId, callback) {
         request.get(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    },
+
+    /**
+     * Set a PNG image to raster source
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     * error: null or Error('message')
+     * returns the Job ID in the response {jobId: $jobId}
+     */
+    setRasterSourcePng: function (venueId, rasterSourceId, filePath, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        const req = request.post(
+            url, responseWrapper(callback))
+        const form = req.form();
+        form.append('file', fs.createReadStream(filePath));
     },
 
     /**
