@@ -1314,14 +1314,14 @@ MapwizeApi.prototype = {
      * Creates a raster source
      *
      * @param venueId 
-     * @param nameRasterSource
+     * @param object
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      */
-    createRasterSource: function (venueId, nameRasterSource, callback) {
+    createRasterSource: function (venueId, object, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.post(url, {
-            body: { "name": nameRasterSource },
+            body: object,
             json: true
         }, responseWrapper(callback))
     },
@@ -1344,13 +1344,13 @@ MapwizeApi.prototype = {
      *
      * @param venueId
      * @param rasterSourceId
-     * @param rasterSourceName
+     * @param object
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      */
-    updateRasterSourceName: function (venueId, rasterSourceId, rasterSourceName, callback) {
+    updateRasterSourceName: function (venueId, rasterSourceId, object, callback) {
         request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: { "name": rasterSourceName },
+            body: object,
             json: true
         }, responseWrapper(callback));
     },
