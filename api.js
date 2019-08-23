@@ -189,7 +189,7 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
             }
         }
     ], function (err) {
-        callback(err, [serverObjects,objectsToCreate,objectsToDelete,objectsToUpdate]);
+        callback(err, [serverObjects, objectsToCreate, objectsToDelete, objectsToUpdate]);
     });
 };
 
@@ -1088,6 +1088,18 @@ MapwizeApi.prototype = {
     },
 
     /**
+     * Retrieves the list of sources for a venue
+     *
+     * @param venueId
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     */
+    getVenueSources: function (venueId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
      * Creates a place source
      *
      * @param venueId 
@@ -1269,7 +1281,7 @@ MapwizeApi.prototype = {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
     },
-    
+
     /**
      * Retrieves data associated to a given Autocad source
      * 
@@ -1298,4 +1310,198 @@ MapwizeApi.prototype = {
         request.put(url, { body: data, json: true }, responseWrapper(callback))
     },
 
+    /**
+     * Creates a raster source
+     *
+     * @param venueId 
+     * @param object
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     */
+    createRasterSource: function (venueId, object, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.post(url, {
+            body: object,
+            json: true
+        }, responseWrapper(callback))
+    },
+
+    /**
+     * Retrieves a given raster source
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    getRasterSource: function (venueId, rasterSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Update a raster source
+     *
+     * @param venueId
+     * @param rasterSourceId
+     * @param object
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     */
+    updateRasterSource: function (venueId, rasterSourceId, object, callback) {
+        request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+            body: object,
+            json: true
+        }, responseWrapper(callback));
+    },
+
+    /**
+     * Delete a raster source
+     *
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    deleteRasterSource: function (venueId, rasterSourceId, callback) {
+        request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    },
+
+    /**
+     * Retrieves the PNG image of the raster source
+     *
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    getRasterSourcePng: function (venueId, rasterSourceId, callback) {
+        request.get(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    },
+
+    /**
+     * Set a PNG image to raster source
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     * error: null or Error('message')
+     * returns the Job ID in the response {jobId: $jobId}
+     */
+    setRasterSourcePng: function (venueId, rasterSourceId, filePath, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        const req = request.post(
+            url, responseWrapper(callback))
+        const form = req.form();
+        form.append('file', fs.createReadStream(filePath));
+    },
+
+    /**
+     * Launches a setup job for a given raster source
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     * error: null or Error('message')
+     * returns the Job ID in the response {jobId: $jobId}
+     */
+    runRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.post(url, { json: true }, responseWrapper(callback))
+    },
+
+    /**
+     * Gets the status of the setup job for a given raster source
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    getRunRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+    * Get the PNG preview
+    * 
+    * @param venueId
+    * @param rasterSourceId
+    * @param callback the result callback called with one argument
+    *  error: null or Error('message')
+    */
+    getRasterSourcePreviewPng: function (venueId, rasterSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/previewPNG?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Get the source params (bbox only)
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    getRasterSourceParams: function (venueId, rasterSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Get the source configuration
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    getRasterSourceConfig: function (venueId, rasterSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Update the raster source configuration
+     *
+     * @param venueId
+     * @param rasterSourceId
+     * @param config
+     * @param callback the result callback called with two arguments
+     *  error: null or Error('message')
+     */
+    updateRasterSourceConfig: function (venueId, rasterSourceId, config, callback) {
+        request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+            body: config,
+            json: true
+        }, responseWrapper(callback));
+    },
+
+    /**
+     * Launches a run job for a given raster source
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     * error: null or Error('message')
+     * returns the Job ID in the response {jobId: $jobId}
+     */
+    runRasterSourceJob: function (venueId, rasterSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.post(url, { json: true }, responseWrapper(callback))
+    },
+
+    /**
+    * Get the status of the run job for a given raster source
+    * 
+    * @param venueId
+    * @param rasterSourceId
+    * @param callback the result callback called with one argument
+    *  error: null or Error('message')
+    */
+    getRunRasterSourceJob: function (venueId, rasterSourceId, callback) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        request.get(url, { json: true }, responseWrapper(callback));
+    },
 };
