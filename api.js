@@ -2,6 +2,7 @@ var request = require('request');
 request = request.defaults({ jar: true });
 var _ = require('lodash');
 var async = require('async');
+var fs = require('fs');
 
 module.exports = MapwizeApi;
 
@@ -1390,9 +1391,8 @@ MapwizeApi.prototype = {
      */
     setRasterSourcePng: function (venueId, rasterSourceId, filePath, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        const req = request.post(
-            url, responseWrapper(callback))
-        const form = req.form();
+        var req = request.post(url, responseWrapper(callback));
+        var form = req.form();
         form.append('file', fs.createReadStream(filePath));
     },
 
@@ -1418,9 +1418,37 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with one argument
      *  error: null or Error('message')
      */
-    getRunRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
+    getRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         request.get(url, { json: true }, responseWrapper(callback));
+    },
+
+    /**
+     * Waits for the Setup job to be finished
+     * 
+     * @param venueId
+     * @param rasterSourceId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    waitRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
+        var state;
+        async.doUntil( done => {
+            setTimeout( () => {
+                this.getRasterSourceSetupJob(venueId, rasterSourceId, (err, info) => {
+                    console.log(info);
+                    state = info.state;
+                    done();
+                });
+            }, 1000);
+        }, () => {
+            if (state == 'completed') {
+                return true;
+            } else {
+                return false;
+            }
+            //stuck, failed should fail
+        }, callback);        
     },
 
     /**
@@ -1471,7 +1499,7 @@ MapwizeApi.prototype = {
      * @param callback the result callback called with two arguments
      *  error: null or Error('message')
      */
-    updateRasterSourceConfig: function (venueId, rasterSourceId, config, callback) {
+    setRasterSourceConfig: function (venueId, rasterSourceId, config, callback) {
         request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: config,
             json: true
