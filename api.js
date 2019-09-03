@@ -1,5 +1,4 @@
 var request = require('request');
-request = request.defaults({ jar: true });
 var _ = require('lodash');
 var async = require('async');
 var fs = require('fs');
@@ -229,6 +228,9 @@ function MapwizeApi(apiKey, organizationId, opts) {
         opts = {};
     }
 
+    var cookie = request.jar();
+    this.request = request.defaults({ jar: cookie });
+
     this.serverUrl = opts.serverUrl || 'https://api.mapwize.io';
     this.apiKey = apiKey;
     this.organizationId = organizationId;
@@ -252,7 +254,7 @@ MapwizeApi.prototype = {
             password: password
         };
         //console.log(this.serverUrl + '/auth/signin');
-        request.post(this.serverUrl + '/v1/auth/signin?api_key=' + this.apiKey, { form: credentials, json: true }, responseWrapper(callback));
+        this.request.post(this.serverUrl + '/v1/auth/signin?api_key=' + this.apiKey, { form: credentials, json: true }, responseWrapper(callback));
     },
 
     /**
@@ -264,7 +266,7 @@ MapwizeApi.prototype = {
      */
     getAccessGroups: function (callback) {
         var url = this.serverUrl + '/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -278,7 +280,7 @@ MapwizeApi.prototype = {
      */
     createAccessGroup: function (accessGroup, callback) {
         var url = this.serverUrl + '/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.post(url, {
+        this.request.post(url, {
             body: accessGroup,
             json: true
         }, responseWrapper(callback))
@@ -294,7 +296,7 @@ MapwizeApi.prototype = {
 
     getApiKeys: function (callback) {
         var url = this.serverUrl + '/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper((callback)));
+        this.request.get(url, { json: true }, responseWrapper((callback)));
     },
 
     /**
@@ -307,7 +309,7 @@ MapwizeApi.prototype = {
      */
     createApiKey: function (apiKey, callback) {
         var url = this.serverUrl + '/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.post(url, {
+        this.request.post(url, {
             body: apiKey,
             json: true
         }, responseWrapper(callback))
@@ -322,7 +324,7 @@ MapwizeApi.prototype = {
      */
     getUniverses: function (callback) {
         var url = this.serverUrl + '/v1/universes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -335,7 +337,7 @@ MapwizeApi.prototype = {
      *  content: the created universe
      */
     createUniverse: function (universe, callback) {
-        request.post(this.serverUrl + '/v1/universes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.post(this.serverUrl + '/v1/universes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: universe,
             json: true
         }, responseWrapper(callback));
@@ -352,7 +354,7 @@ MapwizeApi.prototype = {
      */
 
     updateUniverse: function (universe, callback) {
-        request.put(this.serverUrl + '/v1/universes/' + universe._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/universes/' + universe._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: universe,
             json: true
         }, responseWrapper(callback));
@@ -367,7 +369,7 @@ MapwizeApi.prototype = {
      */
     getVenues: function (callback) {
         var url = this.serverUrl + '/v1/venues?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&isPublished=all';
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -379,7 +381,7 @@ MapwizeApi.prototype = {
      */
     getVenue: function (venueId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -392,7 +394,7 @@ MapwizeApi.prototype = {
      *  content: the created venue
      */
     createVenue: function (venue, callback) {
-        request.post(this.serverUrl + '/v1/venues?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.post(this.serverUrl + '/v1/venues?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: venue,
             json: true
         }, responseWrapper(callback));
@@ -408,7 +410,7 @@ MapwizeApi.prototype = {
      *  content: the updated venue
      */
     updateVenue: function (venue, callback) {
-        request.put(this.serverUrl + '/v1/venues/' + venue._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/venues/' + venue._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: venue,
             json: true
         }, responseWrapper(callback));
@@ -437,7 +439,7 @@ MapwizeApi.prototype = {
                 page++;
 
                 var url = self.serverUrl + '/v1/places?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&isPublished=all&page=' + page;
-                request.get(url, { json: true }, function (err, response, body) {
+                self.request.get(url, { json: true }, function (err, response, body) {
                     var serverPlacesPage = [];
                     if (!err && response.statusCode == 200) {
                         serverPlacesPage = body;
@@ -465,7 +467,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deletePlace: function (placeId, callback) {
-        request.delete(this.serverUrl + '/v1/places/' + placeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/places/' + placeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -478,7 +480,7 @@ MapwizeApi.prototype = {
      *  content: the created place
      */
     createPlace: function (place, callback) {
-        request.post(this.serverUrl + '/v1/places?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.post(this.serverUrl + '/v1/places?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: place,
             json: true
         }, responseWrapper(callback));
@@ -494,7 +496,7 @@ MapwizeApi.prototype = {
      *  content: the updated place
      */
     updatePlace: function (place, callback) {
-        request.put(this.serverUrl + '/v1/places/' + place._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/places/' + place._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: place,
             json: true
         }, responseWrapper(callback));
@@ -510,7 +512,7 @@ MapwizeApi.prototype = {
      */
     getVenuePlaceLists: function (venueId, callback) {
         var url = this.serverUrl + '/v1/placeLists?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -521,7 +523,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deletePlaceList: function (placeListId, callback) {
-        request.delete(this.serverUrl + '/v1/placeLists/' + placeListId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/placeLists/' + placeListId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -534,7 +536,7 @@ MapwizeApi.prototype = {
      *  content: the created placeList
      */
     createPlaceList: function (placeList, callback) {
-        request.post(this.serverUrl + '/v1/placeLists?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.post(this.serverUrl + '/v1/placeLists?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: placeList,
             json: true
         }, responseWrapper(callback));
@@ -550,7 +552,7 @@ MapwizeApi.prototype = {
      *  content: the updated placeList
      */
     updatePlaceList: function (placeList, callback) {
-        request.put(this.serverUrl + '/v1/placeLists/' + placeList._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/placeLists/' + placeList._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: placeList,
             json: true
         }, responseWrapper(callback));
@@ -566,7 +568,7 @@ MapwizeApi.prototype = {
      */
     getVenueBeacons: function (venueId, callback) {
         var url = this.serverUrl + '/v1/beacons?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -580,7 +582,7 @@ MapwizeApi.prototype = {
      */
     createBeacon: function (beacon, callback) {
         var url = this.serverUrl + '/v1/beacons?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
-        request.post(url, {
+        this.request.post(url, {
             body: beacon,
             json: true
         }, responseWrapper(callback))
@@ -596,7 +598,7 @@ MapwizeApi.prototype = {
      */
     updateBeacon: function (beacon, callback) {
         var url = this.serverUrl + '/v1/beacons/' + beacon._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
-        request.put(url, {
+        this.request.put(url, {
             body: beacon,
             json: true
         }, responseWrapper(callback))
@@ -611,7 +613,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deleteBeacon: function (beaconId, callback) {
-        request.delete(this.serverUrl + '/v1/beacons/' + beaconId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/beacons/' + beaconId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -624,7 +626,7 @@ MapwizeApi.prototype = {
      */
     getVenueTemplates: function (venueId, callback) {
         var url = this.serverUrl + '/v1/placeTemplates?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -637,7 +639,7 @@ MapwizeApi.prototype = {
      *  content: the created template
      */
     createTemplate: function (template, callback) {
-        request.post(this.serverUrl + '/v1/placeTemplates?api_key=' + this.apiKey, {
+        this.request.post(this.serverUrl + '/v1/placeTemplates?api_key=' + this.apiKey, {
             body: template,
             json: true
         }, responseWrapper(callback));
@@ -653,7 +655,7 @@ MapwizeApi.prototype = {
      *  content: the updated template
      */
     updateTemplate: function (template, callback) {
-        request.put(this.serverUrl + '/v1/placeTemplates/' + template._id + '?api_key=' + this.apiKey, {
+        this.request.put(this.serverUrl + '/v1/placeTemplates/' + template._id + '?api_key=' + this.apiKey, {
             body: template,
             json: true
         }, responseWrapper(callback));
@@ -667,7 +669,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deleteTemplate: function (templateId, callback) {
-        request.delete(this.serverUrl + '/v1/placeTemplates/' + templateId + '?api_key=' + this.apiKey, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/placeTemplates/' + templateId + '?api_key=' + this.apiKey, responseWrapper(callback, 204));
     },
 
     /**
@@ -680,7 +682,7 @@ MapwizeApi.prototype = {
      */
     getVenueLayers: function (venueId, callback) {
         var url = this.serverUrl + '/v1/layers?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -691,7 +693,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deleteLayer: function (layerId, callback) {
-        request.delete(this.serverUrl + '/v1/layers/' + layerId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/layers/' + layerId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -704,7 +706,7 @@ MapwizeApi.prototype = {
      *  content: the created layer
      */
     createLayer: function (layer, callback) {
-        request.post(this.serverUrl + '/v1/layers?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.post(this.serverUrl + '/v1/layers?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: layer,
             json: true
         }, responseWrapper(callback));
@@ -720,7 +722,7 @@ MapwizeApi.prototype = {
      *  content: the updated layer
      */
     updateLayer: function (layer, callback) {
-        request.put(this.serverUrl + '/v1/layers/' + layer._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/layers/' + layer._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: layer,
             json: true
         }, responseWrapper(callback));
@@ -736,7 +738,7 @@ MapwizeApi.prototype = {
      */
     getVenueConnectors: function (venueId, callback) {
         var url = this.serverUrl + '/v1/connectors?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -747,7 +749,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deleteConnector: function (connectorId, callback) {
-        request.delete(this.serverUrl + '/v1/connectors/' + connectorId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/connectors/' + connectorId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -760,7 +762,7 @@ MapwizeApi.prototype = {
      *  content: the created connector
      */
     createConnector: function (connector, callback) {
-        request.post(this.serverUrl + '/v1/connectors?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.post(this.serverUrl + '/v1/connectors?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: connector,
             json: true
         }, responseWrapper(callback));
@@ -776,7 +778,7 @@ MapwizeApi.prototype = {
      *  content: the updated connector
      */
     updateConnector: function (connector, callback) {
-        request.put(this.serverUrl + '/v1/connectors/' + connector._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/connectors/' + connector._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: connector,
             json: true
         }, responseWrapper(callback));
@@ -812,7 +814,7 @@ MapwizeApi.prototype = {
                 }
             }
         };
-        request.post({
+        this.request.post({
             url: this.serverUrl + '/v1/layers/' + layerId + '/image?api_key=' + this.apiKey + '&organizationId=' + this.organizationId,
             formData: formData
         }, responseWrapper(callback));
@@ -828,7 +830,7 @@ MapwizeApi.prototype = {
      */
     getVenueRouteGraphs: function (venueId, callback) {
         var url = this.serverUrl + '/v1/routegraphs?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -839,7 +841,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deleteRouteGraph: function (routeGraphId, callback) {
-        request.delete(this.serverUrl + '/v1/routegraphs/' + routeGraphId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/routegraphs/' + routeGraphId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -852,7 +854,7 @@ MapwizeApi.prototype = {
      *  content: the created routeGraph
      */
     createRouteGraph: function (routeGraph, callback) {
-        request.post(this.serverUrl + '/v1/routegraphs?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.post(this.serverUrl + '/v1/routegraphs?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: routeGraph,
             json: true
         }, responseWrapper(callback));
@@ -868,7 +870,7 @@ MapwizeApi.prototype = {
      *  content: the updated routeGraph
      */
     updateRouteGraph: function (routeGraph, callback) {
-        request.put(this.serverUrl + '/v1/routegraphs/' + routeGraph._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/routegraphs/' + routeGraph._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: routeGraph,
             json: true
         }, responseWrapper(callback));
@@ -886,15 +888,15 @@ MapwizeApi.prototype = {
      */
     updateRouteGraphForFloor: function (venueId, floor, routeGraph, callback) {
         var self = this;
-        request.get(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&floor=' + floor, function (err, response, body) {
+        self.request.get(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&floor=' + floor, function (err, response, body) {
             var routeGraphs = JSON.parse(body);
             if (!err && response.statusCode == 200 && routeGraphs.length > 0) {
-                request.put(self.serverUrl + '/v1/routegraphs/' + routeGraphs[0]._id + '?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
+                self.request.put(self.serverUrl + '/v1/routegraphs/' + routeGraphs[0]._id + '?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
                     body: routeGraph,
                     json: true
                 }, responseWrapper(callback));
             } else {
-                request.post(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
+                self.request.post(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
                     body: routeGraph,
                     json: true
                 }, responseWrapper(callback));
@@ -1097,7 +1099,7 @@ MapwizeApi.prototype = {
      */
     getVenueSources: function (venueId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1110,7 +1112,7 @@ MapwizeApi.prototype = {
      */
     createPlaceSource: function (venueId, namePlaceSource, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.post(url, {
+        this.request.post(url, {
             body: { "name": namePlaceSource },
             json: true
         }, responseWrapper(callback))
@@ -1127,7 +1129,7 @@ MapwizeApi.prototype = {
      */
     getPlaceSource: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1140,7 +1142,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     updatePlaceSourceName: function (venueId, placeSourceId, namePlaceSource, callback) {
-        request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: { "name": namePlaceSource },
             json: true
         }, responseWrapper(callback));
@@ -1155,7 +1157,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deletePlaceSource: function (venueId, placeSourceId, callback) {
-        request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -1169,7 +1171,7 @@ MapwizeApi.prototype = {
      */
     getPlaceSourceData: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1183,7 +1185,7 @@ MapwizeApi.prototype = {
      */
     updatePlaceSourceData: function (venueId, placeSourceId, data, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
-        request.post(url, { body: data, json: true }, responseWrapper(callback))
+        this.request.post(url, { body: data, json: true }, responseWrapper(callback))
     },
 
     /**
@@ -1197,7 +1199,7 @@ MapwizeApi.prototype = {
      */
     runPlaceSourceSetupJob: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.post(url, { json: true }, responseWrapper(callback))
+        this.request.post(url, { json: true }, responseWrapper(callback))
     },
 
     /**
@@ -1210,7 +1212,7 @@ MapwizeApi.prototype = {
      */
     getRunPlaceSourceSetupJob: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1223,7 +1225,7 @@ MapwizeApi.prototype = {
      */
     getPlaceSourceParams: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1236,7 +1238,7 @@ MapwizeApi.prototype = {
      */
     getPlaceSourceConfig: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1250,7 +1252,7 @@ MapwizeApi.prototype = {
      */
     updatePlaceSourceConfig: function (venueId, placeSourceId, options, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.put(url, {
+        this.request.put(url, {
             body: options,
             json: true
         }, responseWrapper(callback));
@@ -1267,7 +1269,7 @@ MapwizeApi.prototype = {
      */
     runPlaceSourceJob: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.post(url, { json: true }, responseWrapper(callback))
+        this.request.post(url, { json: true }, responseWrapper(callback))
     },
 
     /**
@@ -1280,7 +1282,7 @@ MapwizeApi.prototype = {
     */
     getRunPlaceSourceJob: function (venueId, placeSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1294,7 +1296,7 @@ MapwizeApi.prototype = {
      */
     getAutocadSourceConfig: function (venueId, autocadSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1308,7 +1310,7 @@ MapwizeApi.prototype = {
      */
     updateAutocadSourceConfig: function (venueId, autocadSourceId, data, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
-        request.put(url, { body: data, json: true }, responseWrapper(callback))
+        this.request.put(url, { body: data, json: true }, responseWrapper(callback))
     },
 
     /**
@@ -1321,7 +1323,7 @@ MapwizeApi.prototype = {
      */
     createRasterSource: function (venueId, object, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.post(url, {
+        this.request.post(url, {
             body: object,
             json: true
         }, responseWrapper(callback))
@@ -1337,7 +1339,7 @@ MapwizeApi.prototype = {
      */
     getRasterSource: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1350,7 +1352,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     updateRasterSource: function (venueId, rasterSourceId, object, callback) {
-        request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: object,
             json: true
         }, responseWrapper(callback));
@@ -1365,7 +1367,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     deleteRasterSource: function (venueId, rasterSourceId, callback) {
-        request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -1377,7 +1379,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     getRasterSourcePng: function (venueId, rasterSourceId, callback) {
-        request.get(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+        this.request.get(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
     },
 
     /**
@@ -1391,7 +1393,7 @@ MapwizeApi.prototype = {
      */
     setRasterSourcePng: function (venueId, rasterSourceId, filePath, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        var req = request.post(url, responseWrapper(callback));
+        var req = this.request.post(url, responseWrapper(callback));
         var form = req.form();
         form.append('file', fs.createReadStream(filePath));
     },
@@ -1407,7 +1409,7 @@ MapwizeApi.prototype = {
      */
     runRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.post(url, { json: true }, responseWrapper(callback))
+        this.request.post(url, { json: true }, responseWrapper(callback))
     },
 
     /**
@@ -1420,7 +1422,7 @@ MapwizeApi.prototype = {
      */
     getRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1461,7 +1463,7 @@ MapwizeApi.prototype = {
     */
     getRasterSourcePreviewPng: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/previewPNG?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1474,7 +1476,7 @@ MapwizeApi.prototype = {
      */
     getRasterSourceParams: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1487,7 +1489,7 @@ MapwizeApi.prototype = {
      */
     getRasterSourceConfig: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 
     /**
@@ -1500,7 +1502,7 @@ MapwizeApi.prototype = {
      *  error: null or Error('message')
      */
     setRasterSourceConfig: function (venueId, rasterSourceId, config, callback) {
-        request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+        this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
             body: config,
             json: true
         }, responseWrapper(callback));
@@ -1517,7 +1519,7 @@ MapwizeApi.prototype = {
      */
     runRasterSourceJob: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.post(url, { json: true }, responseWrapper(callback))
+        this.request.post(url, { json: true }, responseWrapper(callback))
     },
 
     /**
@@ -1530,6 +1532,6 @@ MapwizeApi.prototype = {
     */
     getRunRasterSourceJob: function (venueId, rasterSourceId, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        request.get(url, { json: true }, responseWrapper(callback));
+        this.request.get(url, { json: true }, responseWrapper(callback));
     },
 };
