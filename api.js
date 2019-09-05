@@ -1387,8 +1387,8 @@ MapwizeApi.prototype = {
      * 
      * @param venueId
      * @param rasterSourceId
-     * @param callback the result callback called with one argument
      * @param imageStream the read stream with the image content
+     * @param callback the result callback called with one argument
      * error: null or Error('message')
      * returns the Job ID in the response {jobId: $jobId}
      */
