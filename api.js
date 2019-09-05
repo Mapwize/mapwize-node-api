@@ -1387,15 +1387,26 @@ MapwizeApi.prototype = {
      * 
      * @param venueId
      * @param rasterSourceId
+     * @param imageStream the read stream with the image content
      * @param callback the result callback called with one argument
      * error: null or Error('message')
      * returns the Job ID in the response {jobId: $jobId}
      */
-    setRasterSourcePng: function (venueId, rasterSourceId, filePath, callback) {
+    setRasterSourcePng: function (venueId, rasterSourceId, imageStream, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        var req = this.request.post(url, responseWrapper(callback));
-        var form = req.form();
-        form.append('file', fs.createReadStream(filePath));
+        var formData = {
+            file: {
+                value: imageStream,
+                options: {
+                    filename: 'image.png',
+                    contentType: 'image/png'
+                }
+            }
+        };
+        this.request.post({
+            url: url,
+            formData: formData
+        }, responseWrapper(callback));
     },
 
     /**
@@ -1435,8 +1446,8 @@ MapwizeApi.prototype = {
      */
     waitRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
         var state;
-        async.doUntil( done => {
-            setTimeout( () => {
+        async.doUntil(done => {
+            setTimeout(() => {
                 this.getRasterSourceSetupJob(venueId, rasterSourceId, (err, info) => {
                     console.log(info);
                     state = info.state;
@@ -1450,7 +1461,7 @@ MapwizeApi.prototype = {
                 return false;
             }
             //stuck, failed should fail
-        }, callback);        
+        }, callback);
     },
 
     /**
