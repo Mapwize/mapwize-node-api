@@ -1391,11 +1391,11 @@ MapwizeApi.prototype = {
      * error: null or Error('message')
      * returns the Job ID in the response {jobId: $jobId}
      */
-    setRasterSourcePng: function (venueId, rasterSourceId, filePath, callback) {
+    setRasterSourcePng: function (venueId, rasterSourceId, file, callback) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         var formData = {
             file: {
-                value: filePath,
+                value: file,
                 options: {
                     filename: 'image.png',
                     contentType: 'image/png'
