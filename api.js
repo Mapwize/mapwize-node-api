@@ -91,7 +91,7 @@ function getComparableTemplate(template) {
     return comparableTemplate;
 }
 
-async function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlural, isEqualFunction, MapwizeApiClient, venueId, objects, options) {
+function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlural, isEqualFunction, MapwizeApiClient, venueId, objects, options) {
     var serverObjects;
     var objectsToUpdate = [];
     var objectsToCreate = [];
@@ -152,11 +152,15 @@ async function syncVenueObjects(objectClass, objectClassCapSingular, objectClass
                     console.log("\ndelete:")
                 }
 
-                async.forEachLimit(objectsToDelete, 10, async object => {
-                    await MapwizeApiClient['delete' + objectClassCapSingular](object._id);
-                    console.log(cmpt + "/" + objectsToDelete.length)
-                    cmpt++;
-                });
+                for(const object of objectsToDelete) {
+                    try {
+                        await MapwizeApiClient['delete' + objectClassCapSingular](object._id);
+                        console.log(cmpt + "/" + objectsToDelete.length)
+                        cmpt++;
+                    } catch (error) {
+                        throw Error('DELETE ERR', error.message)
+                    }                    
+                };
             }
 
             // Update objects
@@ -165,11 +169,15 @@ async function syncVenueObjects(objectClass, objectClassCapSingular, objectClass
                 if (objectsToUpdate.length != 0) {
                     console.log("\nupdate:")
                 }
-                async.forEachLimit(objectsToUpdate, 10, async object => {
-                    await MapwizeApiClient['update' + objectClassCapSingular](object);
-                    console.log(cmpt + "/" + objectsToUpdate.length)
-                    cmpt++;
-                });
+                for(const object of objectsToUpdate) {
+                    try {
+                        await MapwizeApiClient['update' + objectClassCapSingular](object);
+                        console.log(cmpt + "/" + objectsToUpdate.length)
+                        cmpt++;
+                    } catch (error) {
+                        throw Error('UPDATE ERR', error.message)
+                    }
+                };
             } 
 
             // Create objects
@@ -178,18 +186,22 @@ async function syncVenueObjects(objectClass, objectClassCapSingular, objectClass
                 if (objectsToCreate.length != 0) {
                     console.log("\ncreate:")
                 }
-                async.forEachLimit(objectsToCreate, 10, async object => {
-                    let createdObject = await MapwizeApiClient['create' + objectClassCapSingular](object)
-                    object._id = createdObject._id;
-                    console.log(cmpt + "/" + objectsToCreate.length);
-                    cmpt++;
-                });
+                for(const object of objectsToCreate) {
+                    try {
+                        let createdObject = await MapwizeApiClient['create' + objectClassCapSingular](object)
+                        object._id = createdObject._id;
+                        console.log(cmpt + "/" + objectsToCreate.length);
+                        cmpt++; 
+                    } catch (error) {
+                        throw Error('CREATE ERR', error.message)                        
+                    }
+                };
             }
 
             resolve([serverObjects, objectsToCreate, objectsToDelete, objectsToUpdate])
 
         } catch (err) {
-            reject(err.message)
+            reject(err)
         }
     });
 
@@ -480,7 +492,7 @@ MapwizeApi.prototype = {
             this.request.post(this.serverUrl + '/v1/places?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
                 body: place,
                 json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+            }).then(resolve).catch(e => { console.log(e); reject(e.message) });
         });
     },
 
