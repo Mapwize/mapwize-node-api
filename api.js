@@ -1,7 +1,6 @@
-var request = require('request');
+var request = require('request-promise');
 var _ = require('lodash');
 var async = require('async');
-var fs = require('fs');
 
 module.exports = MapwizeApi;
 
@@ -92,28 +91,27 @@ function getComparableTemplate(template) {
     return comparableTemplate;
 }
 
-function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlural, isEqualFunction, MapwizeApiClient, venueId, objects, options, callback) {
+function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlural, isEqualFunction, MapwizeApiClient, venueId, objects, options) {
     var serverObjects;
     var objectsToUpdate = [];
     var objectsToCreate = [];
     var objectsToDelete = [];
 
-    async.series([
-        function (next) {
-            // Get all the venue objects from the server and only keep those defined by filter
-            MapwizeApiClient['getVenue' + objectClassCapPlural](venueId, function (err, allServerObjects) {
-                if (!err) {
-                    if (options.filter) {
-                        serverObjects = _.filter(allServerObjects, options.filter);
-                    } else {
-                        serverObjects = allServerObjects;
-                    }
-                }
-                next(err);
-            });
-        },
-        function (next) {
+    return new Promise (async (resolve, reject) => {
+        try {
+            let allServerObjects = await MapwizeApiClient['getVenue' + objectClassCapPlural](venueId)
+            if (options.filter) {
+                serverObjects = _.filter(allServerObjects, options.filter);
+            } else {
+                serverObjects = allServerObjects;
+            }
+
             // Comparing all the objects to know which ones to create/update/delete
+
+            // Remove spaces in begin and end name of object if exist
+            _.forEach(objects, function (data) {
+                data.name = data.name.trim();
+            })
 
             // Creating maps by name as the matching is done on the name
             objectsByName = _.keyBy(objects, 'name');
@@ -121,8 +119,6 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
 
             objectNames = _.map(objects, 'name');
             serverObjectNames = _.map(serverObjects, 'name');
-
-
             // Compare the objects with similar names
             _.forEach(_.intersection(objectNames, serverObjectNames), function (name) {
                 objectsByName[name]._id = serverObjectsByName[name]._id; // We add the _id in the place if found
@@ -144,75 +140,79 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
                 objectsToDelete.push(serverObjectsByName[name]);
             });
 
-            next();
-        },
-        function (next) {
             console.log('Server objects: ' + serverObjects.length);
             console.log('Objects to create: ' + objectsToCreate.length);
             console.log('Objects to delete: ' + objectsToDelete.length);
             console.log('Objects to update: ' + objectsToUpdate.length);
-            next();
-        },
-        function (next) {
+
             // Delete objects
             if (!options.dryRun) {
-                async.forEachLimit(objectsToDelete, 10, function (object, nextObject) {
-                    MapwizeApiClient['delete' + objectClassCapSingular](object._id, nextObject);
-                }, next);
-            } else {
-                next();
+                var cmpt = 1;
+                if (objectsToDelete.length != 0) {
+                    console.log("\ndelete:")
+                }
+
+                for(const object of objectsToDelete) {
+                    try {
+                        await MapwizeApiClient['delete' + objectClassCapSingular](object._id);
+                        console.log(cmpt + "/" + objectsToDelete.length)
+                        cmpt++;
+                    } catch (error) {
+                        throw Error('DELETE ERR', error.message)
+                    }                    
+                };
             }
-        },
-        function (next) {
+
             // Update objects
             if (!options.dryRun) {
-                async.forEachLimit(objectsToUpdate, 10, function (object, nextObject) {
-                    MapwizeApiClient['update' + objectClassCapSingular](object, nextObject);
-                }, next);
-            } else {
-                next();
-            }
-        },
-        function (next) {
+                var cmpt = 1;
+                if (objectsToUpdate.length != 0) {
+                    console.log("\nupdate:")
+                }
+                for(const object of objectsToUpdate) {
+                    try {
+                        await MapwizeApiClient['update' + objectClassCapSingular](object);
+                        console.log(cmpt + "/" + objectsToUpdate.length)
+                        cmpt++;
+                    } catch (error) {
+                        throw Error('UPDATE ERR', error.message)
+                    }
+                };
+            } 
+
             // Create objects
             if (!options.dryRun) {
-                async.forEachLimit(objectsToCreate, 10, function (object, nextObject) {
-                    MapwizeApiClient['create' + objectClassCapSingular](object, function (err, createdObject) {
-                        if (!err) {
-                            object._id = createdObject._id;
-                        }
-                        nextObject(err);
-                    });
-                }, next);
-            } else {
-                next();
+                var cmpt = 1;
+                if (objectsToCreate.length != 0) {
+                    console.log("\ncreate:")
+                }
+                for(const object of objectsToCreate) {
+                    try {
+                        let createdObject = await MapwizeApiClient['create' + objectClassCapSingular](object)
+                        object._id = createdObject._id;
+                        console.log(cmpt + "/" + objectsToCreate.length);
+                        cmpt++; 
+                    } catch (error) {
+                        throw Error('CREATE ERR', error.message)                        
+                    }
+                };
             }
+
+            resolve([serverObjects, objectsToCreate, objectsToDelete, objectsToUpdate])
+
+        } catch (err) {
+            reject(err)
         }
-    ], function (err) {
-        callback(err, [serverObjects, objectsToCreate, objectsToDelete, objectsToUpdate]);
     });
+
 };
-
-function responseWrapper(callback, expectedStatusCode) {
-    return function (err, response, body) {
-        if (err) {
-            callback(err);
-        } else if ((_.isFinite(expectedStatusCode) && response.statusCode == expectedStatusCode) || response.statusCode == 200) {
-            callback(null, body);
-        } else {
-            callback(new Error(JSON.stringify(body)));
-        }
-    };
-};
-
-
 
 /**
  * Create a MapwizeApi client
  *
- * @param apiKey the Mapwize API key to use. API keys can be found in the Mapwize admin interface under the Application menu
- * @param organizationId the id of your organization. For now, the use of the API is limited to your organization.
- * @param opts an object with optional parameters
+ * @param apiKey {String} the Mapwize API key to use. API keys can be found in the Mapwize admin interface under the Application menu
+ * @param organizationId {String} the id of your organization. For now, the use of the API is limited to your organization.
+ * @param opts {Object} an object with optional parameters
  *  serverUrl the server url to use. Default to production server at https://api.mapwize.io
  * @constructor
  */
@@ -241,90 +241,94 @@ MapwizeApi.prototype = {
     /**
      * Sign in to the API
      *
-     * @param email
-     * @param password
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the user object if signing in was successful
+     * @param email {String}
+     * @param password {String}
+     * @returns {Object} the user object if signing in was successful
      */
 
-    signIn: function (email, password, callback) {
+    signIn: function (email, password) {
         var credentials = {
             email: email,
             password: password
         };
         //console.log(this.serverUrl + '/auth/signin');
-        this.request.post(this.serverUrl + '/v1/auth/signin?api_key=' + this.apiKey, { form: credentials, json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/auth/signin?api_key=' + this.apiKey, { form: credentials, json: true })
+            .then(resolve).catch(e => { reject(e.message) });
+        })
     },
 
     /**
      * Get all accessGroups of organization
      *
-     * @param callback
-     *  error : null or Error('message')
-     *  content : the list of access groups if signing in was successful
+     * @returns {Array} the list of access groups if signing in was successful
      */
-    getAccessGroups: function (callback) {
+    getAccessGroups: function () {
         var url = this.serverUrl + '/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {             
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });         
+        });
     },
 
     /**
      * Create an accessGroup
      * The owner need to be specified in the accessGroup object
      *
-     * @param accessGroups
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the created accessGroups
+     * @param accessGroup {Object}         
+     * @returns {Object} the created accessGroup
      */
-    createAccessGroup: function (accessGroup, callback) {
+    createAccessGroup: function (accessGroup) {
         var url = this.serverUrl + '/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.post(url, {
-            body: accessGroup,
-            json: true
-        }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => { 
+            this.request.post(url, {
+                body: accessGroup,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all api key of organization
      *
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the list of universes if signing in was successful
+          
+     * @returns the list of universes if signing in was successful
      */
 
-    getApiKeys: function (callback) {
+    getApiKeys: function () {
         var url = this.serverUrl + '/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper((callback)));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Create an api key
      *
      * @param apiKey
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the created accessGroups
+          
+     * @returns the created accessGroups
      */
-    createApiKey: function (apiKey, callback) {
+    createApiKey: function (apiKey) {
         var url = this.serverUrl + '/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.post(url, {
-            body: apiKey,
-            json: true
-        }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, {
+                body: apiKey,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all universes of organization
      *
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the list of universes if signing in was successful
+          
+     * @returns the list of universes if signing in was successful
      */
-    getUniverses: function (callback) {
+    getUniverses: function () {
         var url = this.serverUrl + '/v1/universes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -332,15 +336,15 @@ MapwizeApi.prototype = {
      * The owner need to be specified in the universe object
      *
      * @param universe
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created universe
+     * @returns the created universe
      */
-    createUniverse: function (universe, callback) {
-        this.request.post(this.serverUrl + '/v1/universes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: universe,
-            json: true
-        }, responseWrapper(callback));
+    createUniverse: function (universe) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/universes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: universe,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -348,40 +352,42 @@ MapwizeApi.prototype = {
      * The universe object needs to contain a valid _id
      *
      * @param universe
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated universe
+     * @returns the updated universe
      */
 
-    updateUniverse: function (universe, callback) {
-        this.request.put(this.serverUrl + '/v1/universes/' + universe._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: universe,
-            json: true
-        }, responseWrapper(callback));
+    updateUniverse: function (universe) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/universes/' + universe._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: universe,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all venues of organization (including unpublished)
      *
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the list of venues if signing in was successful
+          
+     * @returns the list of venues if signing in was successful
      */
-    getVenues: function (callback) {
+    getVenues: function () {
         var url = this.serverUrl + '/v1/venues?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&isPublished=all';
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });        
     },
 
     /**
      * Get a venue by id
      *
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the venue if signing in was successful
+          
+     * @returns the venue if signing in was successful
      */
-    getVenue: function (venueId, callback) {
+    getVenue: function (venueId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -389,15 +395,15 @@ MapwizeApi.prototype = {
      * The owner need to be specified in the venue object
      *
      * @param venue
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created venue
+     * @returns the created venue
      */
-    createVenue: function (venue, callback) {
-        this.request.post(this.serverUrl + '/v1/venues?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: venue,
-            json: true
-        }, responseWrapper(callback));
+    createVenue: function (venue) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/venues?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: venue,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -405,69 +411,73 @@ MapwizeApi.prototype = {
      * The venue object needs to contain a valid _id
      *
      * @param venue
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated venue
+     * @returns the updated venue
      */
-    updateVenue: function (venue, callback) {
-        this.request.put(this.serverUrl + '/v1/venues/' + venue._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: venue,
-            json: true
-        }, responseWrapper(callback));
+    updateVenue: function (venue) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/venues/' + venue._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: venue,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all places of a venue (including the unpublished places)
      *
-     * @param venueId
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the places
+     * @param venueId {String}
+          
+     * @returns the places
      */
-    getVenuePlaces: function (venueId, callback) {
+    getVenuePlaces: function (venueId) {
         var self = this;
 
         var emptyResponse = false;
         var page = 0;
         var places = [];
 
-        async.until(
-            function () {
-                return emptyResponse;
-            },
-            function (nextPage) {
-                page++;
-
-                var url = self.serverUrl + '/v1/places?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&isPublished=all&page=' + page;
-                self.request.get(url, { json: true }, function (err, response, body) {
-                    var serverPlacesPage = [];
-                    if (!err && response.statusCode == 200) {
-                        serverPlacesPage = body;
+        return new Promise((resolve, reject) => {
+            async.until(
+                () => emptyResponse,
+                nextPage => {
+                    page++;
+    
+                    var url = self.serverUrl + '/v1/places?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&isPublished=all&page=' + page;
+    
+                    self.request.get(url, { json: true })
+                    .then((body) => {
+                        var serverPlacesPage =  body;
+                        
                         if (serverPlacesPage.length) {
                             places = _.concat(places, serverPlacesPage);
                         }
                         emptyResponse = serverPlacesPage.length === 0;
                         nextPage();
-                    } else {
-                        nextPage(err || response.statusCode);
-                    }
-                });
+                    }).catch(e => {
+                        nextPage(e);                   
+                    });
             },
-            function (err) {
-                callback(err, places);
-            }
-        );
+            err => {
+                if(err) {
+                    reject(err.message);
+                }
+                else {
+                    resolve(places);
+                }
+            });
+        });        
     },
 
     /**
      * Delete a place by id
      *
      * @param placeId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    deletePlace: function (placeId, callback) {
-        this.request.delete(this.serverUrl + '/v1/places/' + placeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    deletePlace: function (placeId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/places/' + placeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -475,15 +485,15 @@ MapwizeApi.prototype = {
      * The venueId and the owner need to be specified in the place object
      *
      * @param place
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created place
+     * @returns the created place
      */
-    createPlace: function (place, callback) {
-        this.request.post(this.serverUrl + '/v1/places?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: place,
-            json: true
-        }, responseWrapper(callback));
+    createPlace: function (place) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/places?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: place,
+                json: true
+            }).then(resolve).catch(e => { console.log(e); reject(e.message) });
+        });
     },
 
     /**
@@ -491,39 +501,41 @@ MapwizeApi.prototype = {
      * The place object needs to contain a valid _id
      *
      * @param place
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated place
+     * @returns the updated place
      */
-    updatePlace: function (place, callback) {
-        this.request.put(this.serverUrl + '/v1/places/' + place._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: place,
-            json: true
-        }, responseWrapper(callback));
+    updatePlace: function (place) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/places/' + place._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: place,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all placeLists of a venue (including the unpublished placeLists)
      *
-     * @param venueId
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the placeLists
+     * @param venueId {String}
+          
+     * @returns the placeLists
      */
-    getVenuePlaceLists: function (venueId, callback) {
+    getVenuePlaceLists: function (venueId) {
         var url = this.serverUrl + '/v1/placeLists?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Delete a placeList by id
      *
      * @param placeListId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    deletePlaceList: function (placeListId, callback) {
-        this.request.delete(this.serverUrl + '/v1/placeLists/' + placeListId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    deletePlaceList: function (placeListId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/placeLists/' + placeListId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -531,15 +543,15 @@ MapwizeApi.prototype = {
      * The venueId and the owner need to be specified in the placeList object
      *
      * @param placeList
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created placeList
+     * @returns the created placeList
      */
-    createPlaceList: function (placeList, callback) {
-        this.request.post(this.serverUrl + '/v1/placeLists?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: placeList,
-            json: true
-        }, responseWrapper(callback));
+    createPlaceList: function (placeList) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/placeLists?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: placeList,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -547,28 +559,29 @@ MapwizeApi.prototype = {
      * The placeList object needs to contain a valid _id
      *
      * @param placeList
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated placeList
+     * @returns the updated placeList
      */
-    updatePlaceList: function (placeList, callback) {
-        this.request.put(this.serverUrl + '/v1/placeLists/' + placeList._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: placeList,
-            json: true
-        }, responseWrapper(callback));
+    updatePlaceList: function (placeList) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/placeLists/' + placeList._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: placeList,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all beacons of a venue (including the unpublished beacons)
      *
-     * @param venueId
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the beacons
+     * @param venueId {String}
+          
+     * @returns the beacons
      */
-    getVenueBeacons: function (venueId, callback) {
+    getVenueBeacons: function (venueId) {
         var url = this.serverUrl + '/v1/beacons?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -576,57 +589,60 @@ MapwizeApi.prototype = {
      * The venueId and the owner need to be specified in the beacon object
      *
      * @param beacon
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created beacon
+     * @returns the created beacon
      */
-    createBeacon: function (beacon, callback) {
+    createBeacon: function (beacon) {
         var url = this.serverUrl + '/v1/beacons?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
-        this.request.post(url, {
-            body: beacon,
-            json: true
-        }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, {
+                body: beacon,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * update a Beacon
      *
      * @param beacon
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated beacon
+     * @returns the updated beacon
      */
-    updateBeacon: function (beacon, callback) {
+    updateBeacon: function (beacon) {
         var url = this.serverUrl + '/v1/beacons/' + beacon._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
-        this.request.put(url, {
-            body: beacon,
-            json: true
-        }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {        
+            this.request.put(url, {
+                body: beacon,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Delete a Beacon
      *
      * @param beaconId
-     * @param callback
-     * the result callback called with one arguments
-     *  error: null or Error('message')
+          * the result callback called with one arguments
+     
      */
-    deleteBeacon: function (beaconId, callback) {
-        this.request.delete(this.serverUrl + '/v1/beacons/' + beaconId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    deleteBeacon: function (beaconId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/beacons/' + beaconId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all templates of a venue
      *
-     * @param venueId
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the templates
+     * @param venueId {String}
+          
+     * @returns the templates
      */
-    getVenueTemplates: function (venueId, callback) {
+    getVenueTemplates: function (venueId) {
         var url = this.serverUrl + '/v1/placeTemplates?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -634,15 +650,15 @@ MapwizeApi.prototype = {
      * The name, venueId and the owner need to be specified in the template object
      *
      * @param template
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created template
+     * @returns the created template
      */
-    createTemplate: function (template, callback) {
-        this.request.post(this.serverUrl + '/v1/placeTemplates?api_key=' + this.apiKey, {
-            body: template,
-            json: true
-        }, responseWrapper(callback));
+    createTemplate: function (template) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/placeTemplates?api_key=' + this.apiKey, {
+                body: template,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -650,50 +666,53 @@ MapwizeApi.prototype = {
      * The template object needs to contain a valid _id
      *
      * @param template
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated template
+     * @returns the updated template
      */
-    updateTemplate: function (template, callback) {
-        this.request.put(this.serverUrl + '/v1/placeTemplates/' + template._id + '?api_key=' + this.apiKey, {
-            body: template,
-            json: true
-        }, responseWrapper(callback));
+    updateTemplate: function (template) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/placeTemplates/' + template._id + '?api_key=' + this.apiKey, {
+                body: template,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Delete a template by id
      *
      * @param templateId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    deleteTemplate: function (templateId, callback) {
-        this.request.delete(this.serverUrl + '/v1/placeTemplates/' + templateId + '?api_key=' + this.apiKey, responseWrapper(callback, 204));
+    deleteTemplate: function (templateId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/placeTemplates/' + templateId + '?api_key=' + this.apiKey)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all layers of a venue (including the unpublished layers)
      *
-     * @param venueId
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the layers
+     * @param venueId {String}
+          
+     * @returns the layers
      */
-    getVenueLayers: function (venueId, callback) {
+    getVenueLayers: function (venueId) {
         var url = this.serverUrl + '/v1/layers?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Delete a layer by id
      *
      * @param layerId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    deleteLayer: function (layerId, callback) {
-        this.request.delete(this.serverUrl + '/v1/layers/' + layerId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    deleteLayer: function (layerId) {
+        return new Promise ((resolve, reject) => {
+        this.request.delete(this.serverUrl + '/v1/layers/' + layerId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+        .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -701,15 +720,15 @@ MapwizeApi.prototype = {
      * The venueId and the owner need to be specified in the layer object
      *
      * @param layer
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created layer
+     * @returns the created layer
      */
-    createLayer: function (layer, callback) {
-        this.request.post(this.serverUrl + '/v1/layers?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: layer,
-            json: true
-        }, responseWrapper(callback));
+    createLayer: function (layer) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/layers?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: layer,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -717,39 +736,41 @@ MapwizeApi.prototype = {
      * The layer object needs to contain a valid _id
      *
      * @param layer
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated layer
+     * @returns the updated layer
      */
-    updateLayer: function (layer, callback) {
-        this.request.put(this.serverUrl + '/v1/layers/' + layer._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: layer,
-            json: true
-        }, responseWrapper(callback));
+    updateLayer: function (layer) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/layers/' + layer._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: layer,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all connectors of a venue
      *
-     * @param venueId
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the connectors
+     * @param venueId {String}
+          
+     * @returns the connectors
      */
-    getVenueConnectors: function (venueId, callback) {
+    getVenueConnectors: function (venueId) {
         var url = this.serverUrl + '/v1/connectors?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Delete a connector by id
      *
      * @param connectorId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    deleteConnector: function (connectorId, callback) {
-        this.request.delete(this.serverUrl + '/v1/connectors/' + connectorId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    deleteConnector: function (connectorId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/connectors/' + connectorId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -757,15 +778,15 @@ MapwizeApi.prototype = {
      * The venueId and the owner need to be specified in the connector object
      *
      * @param connector
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created connector
+     * @returns the created connector
      */
-    createConnector: function (connector, callback) {
-        this.request.post(this.serverUrl + '/v1/connectors?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: connector,
-            json: true
-        }, responseWrapper(callback));
+    createConnector: function (connector) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/connectors?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: connector,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -773,15 +794,15 @@ MapwizeApi.prototype = {
      * The connector object needs to contain a valid _id
      *
      * @param connector
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated connector
+     * @returns the updated connector
      */
-    updateConnector: function (connector, callback) {
-        this.request.put(this.serverUrl + '/v1/connectors/' + connector._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: connector,
-            json: true
-        }, responseWrapper(callback));
+    updateConnector: function (connector) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/connectors/' + connector._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: connector,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -789,14 +810,12 @@ MapwizeApi.prototype = {
      *
      * @param layerId
      * @param imageStream the read stream with the image content
-     * @param topLeft the {latitude longitude} object for the top left corner
-     * @param topRight the {latitude longitude} object for the top right corner
-     * @param bottomLeft the {latitude longitude} object for the bottom left corner
-     * @param bottomRight the {latitude longitude} object for the bottom right corner
-     * @param callback
-     *  error: null or Error('message')
+     * @param topLeft {Object} {latitude longitude} for the top left corner
+     * @param topRight {Object} {latitude longitude} for the top right corner
+     * @param bottomLeft {Object} {latitude longitude} for the bottom left corner
+     * @param bottomRight {Object} {latitude longitude} for the bottom right corner
      */
-    uploadLayerImage: function (layerId, imageStream, topLeft, topRight, bottomLeft, bottomRight, callback) {
+    uploadLayerImage: function (layerId, imageStream, topLeft, topRight, bottomLeft, bottomRight) {
         var formData = {
             importJob: JSON.stringify({
                 corners: [
@@ -814,34 +833,38 @@ MapwizeApi.prototype = {
                 }
             }
         };
-        this.request.post({
-            url: this.serverUrl + '/v1/layers/' + layerId + '/image?api_key=' + this.apiKey + '&organizationId=' + this.organizationId,
-            formData: formData
-        }, responseWrapper(callback));
+        var self = this;
+        return new Promise ((resolve, reject) => {
+            self.request.post({
+                url: self.serverUrl + '/v1/layers/' + layerId + '/image?api_key=' + self.apiKey + '&organizationId=' + self.organizationId,
+                formData: formData
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get all routeGraphs of a venue
      *
-     * @param venueId
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the routeGraphs
+     * @param venueId {String}          
+     * @returns the routeGraphs
      */
-    getVenueRouteGraphs: function (venueId, callback) {
+    getVenueRouteGraphs: function (venueId) {
         var url = this.serverUrl + '/v1/routegraphs?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Delete a routeGraph by id
      *
      * @param routeGraphId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    deleteRouteGraph: function (routeGraphId, callback) {
-        this.request.delete(this.serverUrl + '/v1/routegraphs/' + routeGraphId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    deleteRouteGraph: function (routeGraphId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/routegraphs/' + routeGraphId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -849,58 +872,60 @@ MapwizeApi.prototype = {
      * The venueId and the owner need to be specified in the routeGraphs object
      *
      * @param routeGraph
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the created routeGraph
+     * @returns the created routeGraph
      */
-    createRouteGraph: function (routeGraph, callback) {
-        this.request.post(this.serverUrl + '/v1/routegraphs?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: routeGraph,
-            json: true
-        }, responseWrapper(callback));
+    createRouteGraph: function (routeGraph) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/routegraphs?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: routeGraph,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
-     * Update a routeGraph
+     * Update a routeGraph.
      * The routeGraph object needs to contain a valid _id
      *
      * @param routeGraph
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated routeGraph
+     * @returns the updated routeGraph
      */
-    updateRouteGraph: function (routeGraph, callback) {
-        this.request.put(this.serverUrl + '/v1/routegraphs/' + routeGraph._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: routeGraph,
-            json: true
-        }, responseWrapper(callback));
+    updateRouteGraph: function (routeGraph) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/routegraphs/' + routeGraph._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: routeGraph,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Creates or update the routeGraph for a given floor of a venue
      *
-     * @param venueId
+     * @param venueId {String}
      * @param floor
      * @param routeGraph
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: the updated routeGraph
+     * @returns the updated routeGraph
      */
-    updateRouteGraphForFloor: function (venueId, floor, routeGraph, callback) {
+    updateRouteGraphForFloor: function (venueId, floor, routeGraph) {
         var self = this;
-        self.request.get(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&floor=' + floor, function (err, response, body) {
-            var routeGraphs = JSON.parse(body);
-            if (!err && response.statusCode == 200 && routeGraphs.length > 0) {
-                self.request.put(self.serverUrl + '/v1/routegraphs/' + routeGraphs[0]._id + '?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
-                    body: routeGraph,
-                    json: true
-                }, responseWrapper(callback));
-            } else {
-                self.request.post(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
-                    body: routeGraph,
-                    json: true
-                }, responseWrapper(callback));
-            }
+        
+        return new Promise ((resolve, reject) => {
+            self.request.get(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&floor=' + floor)
+            .then(body => {
+                var routeGraphs = JSON.parse(body);
+                if (routeGraphs.length > 0) {
+                    self.request.put(self.serverUrl + '/v1/routegraphs/' + routeGraphs[0]._id + '?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
+                        body: routeGraph,
+                        json: true
+                    }).then(resolve).catch(e => { reject(e.message) });
+                } else {
+                    self.request.post(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
+                        body: routeGraph,
+                        json: true
+                    }).then(resolve).catch(e => { reject(e.message) });
+                }
+            }).catch(e => { reject(e.message) });
         });
     },
 
@@ -915,11 +940,6 @@ MapwizeApi.prototype = {
         return _.isEqual(getComparableLayer(layer1), getComparableLayer(layer2));
     },
 
-    compareLayers: function (layer1, layer2) {
-        //TODO
-    },
-
-
     /**
      * Returns true if both places have equal content (_id excluded)
      *
@@ -929,10 +949,6 @@ MapwizeApi.prototype = {
      */
     isPlaceEqual: function (place1, place2) {
         return _.isEqual(getComparablePlace(place1), getComparablePlace(place2));
-    },
-
-    comparePlaces: function (place1, place2) {
-        //TODO
     },
 
     /**
@@ -946,10 +962,6 @@ MapwizeApi.prototype = {
         return _.isEqual(getComparablePlaceList(placeList1), getComparablePlaceList(placeList2));
     },
 
-    comparePlaceLists: function (placeList1, placeList2) {
-        //TODO
-    },
-
     /**
      * Returns true if both connectors have equal content (_id excluded)
      *
@@ -959,10 +971,6 @@ MapwizeApi.prototype = {
      */
     isConnectorEqual: function (connector1, connector2) {
         return _.isEqual(getComparableConnector(connector1), getComparableConnector(connector2));
-    },
-
-    compareConnector: function (connector1, connector2) {
-        //TODO
     },
 
     /**
@@ -976,10 +984,6 @@ MapwizeApi.prototype = {
         return _.isEqual(getComparableBeacon(beacon1), getComparableBeacon(beacon2));
     },
 
-    compareBeacon: function (beacon1, beacon2) {
-        //TODO
-    },
-
     /**
      * Returns true if both template have equal content (_id excluded)
      * @param template1
@@ -990,409 +994,393 @@ MapwizeApi.prototype = {
         return _.isEqual(getComparableTemplate(template1), getComparableTemplate(template2));
     },
 
-    compareTemplate: function () {
-        //TODO
-    },
-
     /**
      * Create, update or delete all the layers on the server to match with the given list of objects.
      * The name parameter is used as index key.
      *
-     * @param venueId
-     * @param objects list of layers. All layers need to contain the venueId and owner parameters
-     * @param options object with optional parameters
+     * @param venueId {String}
+     * @param object {Object}s {Object} list of layers. All layers need to contain the venueId and owner parameters
+     * @param options {Object} object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
-     *  error: null or Error('message')
      */
-    syncVenueLayers: function (venueId, objects, options, callback) {
-        syncVenueObjects('layer', 'Layer', 'Layers', this.isLayerEqual, this, venueId, objects, options, callback);
+    syncVenueLayers: async function (venueId, objects, options) {
+        return await syncVenueObjects('layer', 'Layer', 'Layers', this.isLayerEqual, this, venueId, objects, options);
     },
 
     /**
      * Create, update or delete all the places on the server to match with the given list of objects.
      * The name parameter is used as index key.
      *
-     * @param venueId
-     * @param objects list of places. All places need to contain the venueId and owner parameters
-     * @param options object with optional parameters
+     * @param venueId {String}
+     * @param object {Object}s {Object} list of places. All places need to contain the venueId and owner parameters
+     * @param options {Object} object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
-     *  error: null or Error('message')
      */
-    syncVenuePlaces: function (venueId, objects, options, callback) {
-        syncVenueObjects('place', 'Place', 'Places', this.isPlaceEqual, this, venueId, objects, options, callback);
+    syncVenuePlaces: async function (venueId, objects, options) {
+        return await syncVenueObjects('place', 'Place', 'Places', this.isPlaceEqual, this, venueId, objects, options);
     },
 
     /**
      * Create, update or delete all the placeLists on the server to match with the given list of objects.
      * The name parameter is used as index key.
      *
-     * @param venueId
-     * @param objects list of placeLists. All placeLists need to contain the venueId and owner parameters
-     * @param options object with optional parameters
+     * @param venueId {String}
+     * @param object {Object}s {Object} list of placeLists. All placeLists need to contain the venueId and owner parameters
+     * @param options {Object} object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
-     *  error: null or Error('message')
      */
-    syncVenuePlaceLists: function (venueId, objects, options, callback) {
-        syncVenueObjects('placeList', 'PlaceList', 'PlaceLists', this.isPlaceListEqual, this, venueId, objects, options, callback);
+    syncVenuePlaceLists: async function (venueId, objects, options) {
+        return await syncVenueObjects('placeList', 'PlaceList', 'PlaceLists', this.isPlaceListEqual, this, venueId, objects, options);
     },
 
     /**
      * Create, update or delete all the connectors on the server to match with the given list of objects.
      * The name parameter is used as index key.
      *
-     * @param venueId
-     * @param objects list of connectors. All connectors need to contain the venueId and owner parameters
-     * @param options object with optional parameters
+     * @param venueId {String}
+     * @param object {Object}s {Object} list of connectors. All connectors need to contain the venueId and owner parameters
+     * @param options {Object} object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
-     *  error: null or Error('message')
      */
-    syncVenueConnectors: function (venueId, objects, options, callback) {
-        syncVenueObjects('connector', 'Connector', 'Connectors', this.isConnectorEqual, this, venueId, objects, options, callback);
+    syncVenueConnectors: async function (venueId, objects, options) {
+        return await syncVenueObjects('connector', 'Connector', 'Connectors', this.isConnectorEqual, this, venueId, objects, options);
     },
 
     /**
      * Create, update or delete all the beacons on the server to match with the given list of objects.
      * The name parameter is used as index key.
      *
-     * @param venueId
-     * @param objects list of beacons. All beacons need to contain the venueId and owner parameters
-     * @param options object with optional parameters
+     * @param venueId {String}
+     * @param object {Object}s {Object} list of beacons. All beacons need to contain the venueId and owner parameters
+     * @param options {Object} object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
-     *  error: null or Error('message')
      */
-    syncVenueBeacons: function (venueId, objects, options, callback) {
-        syncVenueObjects('beacons', 'Beacon', 'Beacons', this.isBeaconEqual, this, venueId, objects, options, callback)
+    syncVenueBeacons: async function (venueId, objects, options) {
+        return await syncVenueObjects('beacons', 'Beacon', 'Beacons', this.isBeaconEqual, this, venueId, objects, options)
     },
 
     /**
      * Create, update or delete all the templates on the server to match with the given list of objects.
      * The name parameter is used as index key.
      *
-     * @param venueId
-     * @param objects list of templates. All connectors need to contain the venueId and owner parameters
-     * @param options object with optional parameters
+     * @param venueId {String}
+     * @param object {Object}s {Object} list of templates. All connectors need to contain the venueId and owner parameters
+     * @param options {Object} object with optional parameters
      *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
      *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
-     * @param callback the resulting with an array of objects: 0) all objects, 1) objects to update, 2) objects to create 3) object to delete
-     *  error: null or Error('message')
      */
-    syncVenueTemplates: function (venueId, objects, options, callback) {
-        syncVenueObjects('template', 'Template', 'Templates', this.isTemplateEqual, this, venueId, objects, options, callback);
+    syncVenueTemplates: async function (venueId, objects, options) {
+        return await syncVenueObjects('template', 'Template', 'Templates', this.isTemplateEqual, this, venueId, objects, options);
     },
 
     /**
      * Retrieves the list of sources for a venue
      *
-     * @param venueId
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
+     * @param venueId {String}
      */
-    getVenueSources: function (venueId, callback) {
+    getVenueSources: function (venueId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Creates a place source
      *
-     * @param venueId 
+     * @param venueId {String} 
      * @param namePlaceSource
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
      */
-    createPlaceSource: function (venueId, namePlaceSource, callback) {
+    createPlaceSource: function (venueId, namePlaceSource) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.post(url, {
-            body: { "name": namePlaceSource },
-            json: true
-        }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, {
+                body: { "name": namePlaceSource },
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Retrieves a given place source
      *
-     * @param venueId
-     * @param placeSourceId
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
-     *  content: given place source
+     * @param venueId {String}
+     * @param placeSourceId {String}
+     * @returns given place source
      */
-    getPlaceSource: function (venueId, placeSourceId, callback) {
+    getPlaceSource: function (venueId, placeSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Update a place source name
      *
-     * @param venueId
-     * @param placeSourceId
+     * @param venueId {String}
+     * @param placeSourceId {String}
      * @param namePlaceSource
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
      */
-    updatePlaceSourceName: function (venueId, placeSourceId, namePlaceSource, callback) {
-        this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: { "name": namePlaceSource },
-            json: true
-        }, responseWrapper(callback));
+    updatePlaceSourceName: function (venueId, placeSourceId, namePlaceSource) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: { "name": namePlaceSource },
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Delete a place source
      *
-     * @param venueId
-     * @param placeSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param placeSourceId {String}
      */
-    deletePlaceSource: function (venueId, placeSourceId, callback) {
-        this.request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    deletePlaceSource: function (venueId, placeSourceId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Retrieves data associated to a given place source
      * 
-     * @param venueId
-     * @param placeSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
-     *  content: data associated to a given place source
+     * @param venueId {String}
+     * @param placeSourceId {String}
+     * @returns data associated to a given place source
      */
-    getPlaceSourceData: function (venueId, placeSourceId, callback) {
+    getPlaceSourceData: function (venueId, placeSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Update data associated to a given place source
      * 
-     * @param venueId
-     * @param placeSourceId
+     * @param venueId {String}
+     * @param placeSourceId {String}
      * @param data
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    updatePlaceSourceData: function (venueId, placeSourceId, data, callback) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
-        this.request.post(url, { body: data, json: true }, responseWrapper(callback))
+    updatePlaceSourceData: function (venueId, placeSourceId, data) {
+        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';        
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, { body: data, json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Launches a setup job for a given place source
      * 
-     * @param venueId
-     * @param placeSourceId
-     * @param callback the result callback called with one argument
-     * error: null or Error('message')
-     * returns the Job ID in the response {jobId: $jobId}
+     * @param venueId {String}
+     * @param placeSourceId {String}
+     * @returns {Object} the { jobId } in the response 
      */
-    runPlaceSourceSetupJob: function (venueId, placeSourceId, callback) {
+    runPlaceSourceSetupJob: function (venueId, placeSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.post(url, { json: true }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get a setup job for a given place source
      * 
-     * @param venueId
-     * @param placeSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param placeSourceId {String}
      */
-    getRunPlaceSourceSetupJob: function (venueId, placeSourceId, callback) {
+    getRunPlaceSourceSetupJob: function (venueId, placeSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Retrieves the parameters extracted during the setup job
      * 
-     * @param venueId
-     * @param placeSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param placeSourceId {String}
      */
-    getPlaceSourceParams: function (venueId, placeSourceId, callback) {
+    getPlaceSourceParams: function (venueId, placeSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Retrieves the georeference and place configurations
      * 
-     * @param venueId
-     * @param placeSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param placeSourceId {String}
      */
-    getPlaceSourceConfig: function (venueId, placeSourceId, callback) {
+    getPlaceSourceConfig: function (venueId, placeSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Update the georeference and place configurations
      * 
-     * @param venueId
-     * @param placeSourceId
-     * @param options places => [Object] & propertyForGeoreference => String
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param placeSourceId {String}
+     * @param options {Object} places => [Object] & propertyForGeoreference => String
      */
-    updatePlaceSourceConfig: function (venueId, placeSourceId, options, callback) {
+    updatePlaceSourceConfig: function (venueId, placeSourceId, options) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.put(url, {
-            body: options,
-            json: true
-        }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.put(url, {
+                body: options,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Launches a run job for a given place source
      * 
-     * @param venueId
-     * @param placeSourceId
-     * @param callback the result callback called with one argument
-     * error: null or Error('message')
-     * returns the Job ID in the response {jobId: $jobId}
+     * @param venueId {String}
+     * @param placeSourceId {String}
+     * @returns {Object} the { jobId } in the response
      */
-    runPlaceSourceJob: function (venueId, placeSourceId, callback) {
+    runPlaceSourceJob: function (venueId, placeSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.post(url, { json: true }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
     * Get a run job for a given place source
     * 
-    * @param venueId
-    * @param placeSourceId
-    * @param callback the result callback called with one argument
-    *  error: null or Error('message')
+    * @param venueId {String}
+    * @param placeSourceId {String}
     */
-    getRunPlaceSourceJob: function (venueId, placeSourceId, callback) {
+    getRunPlaceSourceJob: function (venueId, placeSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Retrieves data associated to a given Autocad source
      * 
-     * @param venueId
-     * @param autocadSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
-     *  content: data associated to a given Autocad source
+     * @param venueId {String}
+     * @param autocadSourceId {String}
+     * @returns data associated to a given Autocad source
      */
-    getAutocadSourceConfig: function (venueId, autocadSourceId, callback) {
+    getAutocadSourceConfig: function (venueId, autocadSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Update data associated to a given Autocad source
      * 
-     * @param venueId
-     * @param autocadSourceId
+     * @param venueId {String}
+     * @param autocadSourceId {String}
      * @param data
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    updateAutocadSourceConfig: function (venueId, autocadSourceId, data, callback) {
+    updateAutocadSourceConfig: function (venueId, autocadSourceId, data) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
-        this.request.put(url, { body: data, json: true }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.put(url, { body: data, json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Creates a raster source
      *
-     * @param venueId 
-     * @param object
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
+     * @param venueId {String} 
+     * @param object {Object}
      */
-    createRasterSource: function (venueId, object, callback) {
+    createRasterSource: function (venueId, object) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.post(url, {
-            body: object,
-            json: true
-        }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, {
+                body: object,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Retrieves a given raster source
      * 
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param rasterSourceId {String}
      */
-    getRasterSource: function (venueId, rasterSourceId, callback) {
+    getRasterSource: function (venueId, rasterSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Update a raster source
      *
-     * @param venueId
-     * @param rasterSourceId
-     * @param object
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param rasterSourceId {String}
+     * @param object {Object}
      */
-    updateRasterSource: function (venueId, rasterSourceId, object, callback) {
-        this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: object,
-            json: true
-        }, responseWrapper(callback));
+    updateRasterSource: function (venueId, rasterSourceId, object) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: object,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Delete a raster source
      *
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param rasterSourceId {String}
      */
-    deleteRasterSource: function (venueId, rasterSourceId, callback) {
-        this.request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    deleteRasterSource: function (venueId, rasterSourceId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Retrieves the PNG image of the raster source
      *
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param rasterSourceId {String}
      */
-    getRasterSourcePng: function (venueId, rasterSourceId, callback) {
-        this.request.get(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, responseWrapper(callback, 204));
+    getRasterSourcePng: function (venueId, rasterSourceId) {        
+        return new Promise ((resolve, reject) => {
+            this.request.get(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Set a PNG image to raster source
      * 
-     * @param venueId
-     * @param rasterSourceId
-     * @param imageStream the read stream with the image content
-     * @param callback the result callback called with one argument
-     * error: null or Error('message')
-     * returns the Job ID in the response {jobId: $jobId}
+     * @param venueId {String}
+     * @param rasterSourceId {String}
+     * @returns {Object} the { jobId } in the response
      */
-    setRasterSourcePng: function (venueId, rasterSourceId, imageStream, callback) {
+    setRasterSourcePng: function (venueId, rasterSourceId, imageStream) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
         var formData = {
             file: {
@@ -1403,146 +1391,151 @@ MapwizeApi.prototype = {
                 }
             }
         };
-        this.request.post({
-            url: url,
-            formData: formData
-        }, responseWrapper(callback));
-    },
 
+        return new Promise ((resolve, reject) => {
+            this.request.post({
+                url: url,
+                formData: formData
+            }).then(resolve).catch(e => { reject(e.message) });
+        })
+    },
+    
     /**
      * Launches a setup job for a given raster source
      * 
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     * error: null or Error('message')
-     * returns the Job ID in the response {jobId: $jobId}
+     * @param venueId {String}
+     * @param rasterSourceId {String}
+     * @returns {Object} the { jobId } in the response
      */
-    runRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
+    runRasterSourceSetupJob: function (venueId, rasterSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.post(url, { json: true }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Gets the status of the setup job for a given raster source
      * 
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param rasterSourceId {String}
      */
-    getRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
+    getRasterSourceSetupJob: function (venueId, rasterSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Waits for the Setup job to be finished
      * 
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param rasterSourceId {String}
      */
-    waitRasterSourceSetupJob: function (venueId, rasterSourceId, callback) {
+    waitRasterSourceSetupJob: function (venueId, rasterSourceId) {
         var state;
-        async.doUntil(done => {
-            setTimeout(() => {
-                this.getRasterSourceSetupJob(venueId, rasterSourceId, (err, info) => {
-                    console.log(info);
-                    state = info.state;
-                    done();
-                });
-            }, 1000);
-        }, () => {
-            if (state == 'completed') {
-                return true;
-            } else {
-                return false;
-            }
-            //stuck, failed should fail
-        }, callback);
+        return new Promise ((resolve, reject) => {            
+            async.doUntil( done => {
+                setTimeout( () => {
+                    this.getRasterSourceSetupJob(venueId, rasterSourceId)
+                    .then(info => {
+                        console.log(info);
+                        state = info.state;
+                        done();
+                    }).catch(e => { reject(e.message) })                   
+                }, 1000);
+            }, () => {
+                if (state == 'completed') {
+                    resolve(true);
+                } else {
+                    resolve(false);
+                }
+                //stuck, failed should fail
+            }, resolve()); 
+        });
+              
     },
 
     /**
     * Get the PNG preview
     * 
-    * @param venueId
-    * @param rasterSourceId
-    * @param callback the result callback called with one argument
-    *  error: null or Error('message')
+    * @param venueId {String}
+    * @param rasterSourceId {String}
     */
-    getRasterSourcePreviewPng: function (venueId, rasterSourceId, callback) {
+    getRasterSourcePreviewPng: function (venueId, rasterSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/previewPNG?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Get the source params (bbox only)
      * 
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param rasterSourceId {String}
      */
-    getRasterSourceParams: function (venueId, rasterSourceId, callback) {
+    getRasterSourceParams: function (venueId, rasterSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });       
+        });
     },
 
     /**
      * Get the source configuration
      * 
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
+     * @param venueId {String}
+     * @param rasterSourceId {String}
      */
-    getRasterSourceConfig: function (venueId, rasterSourceId, callback) {
+    getRasterSourceConfig: function (venueId, rasterSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {             
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) }); 
+        });
     },
 
     /**
      * Update the raster source configuration
      *
-     * @param venueId
-     * @param rasterSourceId
+     * @param venueId {String}
+     * @param rasterSourceId {String}
      * @param config
-     * @param callback the result callback called with two arguments
-     *  error: null or Error('message')
      */
-    setRasterSourceConfig: function (venueId, rasterSourceId, config, callback) {
-        this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-            body: config,
-            json: true
-        }, responseWrapper(callback));
+    setRasterSourceConfig: function (venueId, rasterSourceId, config) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: config,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
      * Launches a run job for a given raster source
      * 
-     * @param venueId
-     * @param rasterSourceId
-     * @param callback the result callback called with one argument
-     * error: null or Error('message')
-     * returns the Job ID in the response {jobId: $jobId}
+     * @param venueId {String}
+     * @param rasterSourceId {String}
+     * @returns {Object} the { jobId } in the response
      */
-    runRasterSourceJob: function (venueId, rasterSourceId, callback) {
+    runRasterSourceJob: function (venueId, rasterSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.post(url, { json: true }, responseWrapper(callback))
+        return new Promise ((resolve, reject) => {
+            this.request.post(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
     * Get the status of the run job for a given raster source
     * 
-    * @param venueId
-    * @param rasterSourceId
-    * @param callback the result callback called with one argument
-    *  error: null or Error('message')
+    * @param venueId {String}
+    * @param rasterSourceId {String}
     */
-    getRunRasterSourceJob: function (venueId, rasterSourceId, callback) {
+    getRunRasterSourceJob: function (venueId, rasterSourceId) {
         var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper(callback));
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });         
+        });
     },
 };

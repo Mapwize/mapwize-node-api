@@ -6,8 +6,9 @@
   "main": "api.js",
   "dependencies": {
     "async": "^2.0.1",
-    "lodash": "^4.17.11",
-    "request": "^2.74.1"
+    "lodash": "^4.17.13",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4"
   },
   "devDependencies": {}
 }
