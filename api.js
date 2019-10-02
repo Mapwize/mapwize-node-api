@@ -213,7 +213,7 @@ function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlu
  * @param apiKey {String} the Mapwize API key to use. API keys can be found in the Mapwize admin interface under the Application menu
  * @param organizationId {String} the id of your organization. For now, the use of the API is limited to your organization.
  * @param opts {Object} an object with optional parameters
- *  serverUrl the server url to use. Default to production server at https://api.mapwize.io
+ * @param opts.serverUrl {String} the server url to use. Default to production server at https://api.mapwize.io
  * @constructor
  */
 function MapwizeApi(apiKey, organizationId, opts) {
@@ -999,8 +999,8 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param object {Object}s {Object} list of layers. All layers need to contain the venueId and owner parameters
      * @param options {Object} object with optional parameters
-     *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
-     *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
+     * @param options.filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
+     * @param options.dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
      */
     syncVenueLayers: async function (venueId, objects, options) {
         return await syncVenueObjects('layer', 'Layer', 'Layers', this.isLayerEqual, this, venueId, objects, options);
@@ -1013,8 +1013,8 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param object {Object}s {Object} list of places. All places need to contain the venueId and owner parameters
      * @param options {Object} object with optional parameters
-     *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
-     *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
+     * @param options.filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
+     * @param options.dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
      */
     syncVenuePlaces: async function (venueId, objects, options) {
         return await syncVenueObjects('place', 'Place', 'Places', this.isPlaceEqual, this, venueId, objects, options);
@@ -1027,8 +1027,8 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param object {Object}s {Object} list of placeLists. All placeLists need to contain the venueId and owner parameters
      * @param options {Object} object with optional parameters
-     *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
-     *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
+     * @param options.filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
+     * @param options.dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
      */
     syncVenuePlaceLists: async function (venueId, objects, options) {
         return await syncVenueObjects('placeList', 'PlaceList', 'PlaceLists', this.isPlaceListEqual, this, venueId, objects, options);
@@ -1041,8 +1041,8 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param object {Object}s {Object} list of connectors. All connectors need to contain the venueId and owner parameters
      * @param options {Object} object with optional parameters
-     *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
-     *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
+     * @param options.filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
+     * @param options.dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
      */
     syncVenueConnectors: async function (venueId, objects, options) {
         return await syncVenueObjects('connector', 'Connector', 'Connectors', this.isConnectorEqual, this, venueId, objects, options);
@@ -1055,8 +1055,8 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param object {Object}s {Object} list of beacons. All beacons need to contain the venueId and owner parameters
      * @param options {Object} object with optional parameters
-     *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
-     *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
+     * @param options.filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
+     * @param options.dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
      */
     syncVenueBeacons: async function (venueId, objects, options) {
         return await syncVenueObjects('beacons', 'Beacon', 'Beacons', this.isBeaconEqual, this, venueId, objects, options)
@@ -1069,8 +1069,8 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param object {Object}s {Object} list of templates. All connectors need to contain the venueId and owner parameters
      * @param options {Object} object with optional parameters
-     *  filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
-     *  dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
+     * @param options.filter function taking an object and returning true if the object need to be used in the sync. Only used to filter objects on server side.
+     * @param options.dryRun if true then no operation is sent to server but the number of create, update or delete is logged.
      */
     syncVenueTemplates: async function (venueId, objects, options) {
         return await syncVenueObjects('template', 'Template', 'Templates', this.isTemplateEqual, this, venueId, objects, options);

@@ -5,14 +5,16 @@
   "description": "Mapwize API for Node.js",
   "main": "api.js",
   "scripts": {
-    "docs": "./node_modules/.bin/jsdoc api.js"
+    "docs": "./node_modules/.bin/jsdoc -c jsdoc.json"
   },
   "dependencies": {
-    "async": "^2.0.1",
-    "jsdoc": "^3.6.3",
-    "lodash": "^4.17.13",
-    "request": "^2.88.0",
-    "request-promise": "^4.2.4"
+    "async": "2.0.1",
+    "lodash": "4.17.13",
+    "request": "2.88.0",
+    "request-promise": "4.2.4"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "docdash": "1.1.1",
+    "jsdoc": "3.6.3"
+  }
 }
