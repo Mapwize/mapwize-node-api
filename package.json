@@ -4,8 +4,12 @@
   "version": "1.0.5",
   "description": "Mapwize API for Node.js",
   "main": "api.js",
+  "scripts": {
+    "docs": "./node_modules/.bin/jsdoc api.js"
+  },
   "dependencies": {
     "async": "^2.0.1",
+    "jsdoc": "^3.6.3",
     "lodash": "^4.17.13",
     "request": "^2.88.0",
     "request-promise": "^4.2.4"
