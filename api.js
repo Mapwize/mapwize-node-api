@@ -1536,4 +1536,23 @@ MapwizeApi.prototype = {
             this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });         
         });
     },
+
+    /**
+    * Clone a venue
+    * 
+    * @param venueId {String} the venue to clone
+    * @param toOrganizationId {String} the organization where to clone
+    * @param toVenueName {String} the name of the cloned venue (need to be different from the original venue name)
+    */
+   cloneVenue: function (venueId, toOrganizationId, toVenueName) {
+    var url = this.serverUrl + '/v1/venues/' + venueId + '/clone?api_key=' + this.apiKey;
+    return new Promise ((resolve, reject) => {
+        this.request.post(url, {
+            body:{
+                toOrganizationId: toOrganizationId,
+                toVenueName: toVenueName
+            },
+            json: true }).then(resolve).catch(e => { reject(e.message) });         
+    });
+},
 };
