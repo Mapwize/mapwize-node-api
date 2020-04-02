@@ -317,6 +317,17 @@ MapwizeApi.prototype = {
             }).then(resolve).catch(e => { reject(e.message) });
         });
     },
+    
+    /**
+     * Delete api key
+     *
+     * @param apiKeyId
+     * @param callback the result callback called with one argument
+     *  error: null or Error('message')
+     */
+    deleteApiKey: function (apiKeyId, callback) {
+        this.request.delete(this.serverUrl + '/v1/applications/' + apiKeyId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey, responseWrapper(callback, 204));
+    },
 
     /**
      * Get all universes of organization
