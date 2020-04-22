@@ -8,10 +8,10 @@
     "docs": "./node_modules/.bin/jsdoc -c jsdoc.json"
   },
   "dependencies": {
-    "async": "2.0.1",
-    "lodash": "4.17.13",
-    "request": "2.88.0",
-    "request-promise": "4.2.4"
+    "async": "3.2.0",
+    "lodash": "4.17.15",
+    "request": "2.88.2",
+    "request-promise": "4.2.5"
   },
   "devDependencies": {
     "docdash": "1.1.1",
