@@ -450,7 +450,7 @@ MapwizeApi.prototype = {
      * Get all places of a venue (including the unpublished places)
      *
      * @param venueId {String}
-          
+
      * @returns the places
      */
     getVenuePlaces: function (venueId) {
@@ -462,23 +462,23 @@ MapwizeApi.prototype = {
 
         return new Promise((resolve, reject) => {
             async.until(
-                () => emptyResponse,
+                (callback) => callback(null, emptyResponse),
                 nextPage => {
                     page++;
-    
+
                     var url = self.serverUrl + '/v1/places?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&isPublished=all&page=' + page;
-    
+
                     self.request.get(url, { json: true })
                     .then((body) => {
                         var serverPlacesPage =  body;
-                        
+
                         if (serverPlacesPage.length) {
                             places = _.concat(places, serverPlacesPage);
                         }
                         emptyResponse = serverPlacesPage.length === 0;
                         nextPage();
                     }).catch(e => {
-                        nextPage(e);                   
+                        nextPage(e);
                     });
             },
             err => {
@@ -489,7 +489,7 @@ MapwizeApi.prototype = {
                     resolve(places);
                 }
             });
-        });        
+        });
     },
 
     /**
