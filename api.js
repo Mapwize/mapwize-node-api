@@ -328,6 +328,19 @@ MapwizeApi.prototype = {
     deleteApiKey: function (apiKeyId, callback) {
         this.request.delete(this.serverUrl + '/v1/applications/' + apiKeyId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey, responseWrapper(callback, 204));
     },
+    
+    /**
+     * Get all place types
+     *
+     * @param callback
+     *  error: null or Error('message')
+     *  content: the list of place types
+     */
+
+    getPlaceTypes: function (callback) {
+        var url = this.serverUrl + '/v1/placeTypes?api_key=' + this.apiKey;
+        this.request.get(url, { json: true }, responseWrapper((callback)));
+    },
 
     /**
      * Get all universes of organization
