@@ -1102,7 +1102,6 @@ MapwizeApi.prototype = {
     
     /**
     * Create, update or delete all places on the placelist.
-    * The name parameter is used as index key.
     *
     * @param venueId {String}
     * @param sourceId {String}
