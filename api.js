@@ -337,9 +337,55 @@ MapwizeApi.prototype = {
      *  content: the list of place types
      */
 
-    getPlaceTypes: function (callback) {
-        var url = this.serverUrl + '/v1/placeTypes?api_key=' + this.apiKey;
-        this.request.get(url, { json: true }, responseWrapper((callback)));
+    getPlaceTypes: function () {
+        var url = this.serverUrl + '/v1/placetypes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });
+    },
+
+    /**
+     * Create a placeType
+     * The venueId and the owner need to be specified in the placeType object
+     *
+     * @param placetype
+     * @returns the created placeType
+     */
+    createPlaceType: function (placetype) {
+        return new Promise ((resolve, reject) => {
+            this.request.post(this.serverUrl + '/v1/placetypes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: placetype,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
+    },
+
+    /**
+     * Update a placetype
+     * The placetype object needs to contain a valid _id
+     *
+     * @param placetype
+     * @returns the updated placetype
+     */
+    updatePlaceType: function (placetype) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/placetypes/' + placetype._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: placetype,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
+    },
+
+    /**
+     * Delete a placetype by id
+     *
+     * @param placetypeId
+     */
+    deletePlaceType: function (placetypeId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/placetypes/' + placetypeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
     },
 
     /**
@@ -403,8 +449,7 @@ MapwizeApi.prototype = {
 
     /**
      * Get a venue by id
-     *
-          
+     *        
      * @returns the venue if signing in was successful
      */
     getVenue: function (venueId) {
@@ -533,6 +578,18 @@ MapwizeApi.prototype = {
                 body: place,
                 json: true
             }).then(resolve).catch(e => { reject(e.message) });
+        });
+    },
+
+    /**
+     * Get a place by id
+     *
+     * @returns the place if signing in was successful
+     */
+    getPlace: function (placeId) {
+        var url = this.serverUrl + '/v1/places/' + placeId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
         });
     },
 
