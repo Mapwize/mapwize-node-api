@@ -435,9 +435,65 @@ MapwizeApi.prototype = {
     },
 
     /**
-     * Get all venues of organization (including unpublished)
+     * Get all modes of organization (including unpublished)
+     *    
+     * @returns the list of modes
+     */
+    getModes: function () {
+        var url = this.serverUrl + '/v1/modes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&isPublished=all';
+        return new Promise ((resolve, reject) => {
+            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
+        });        
+    }, 
+
+    /**
+     * Create a mode
+     * The owner need to be specified in the mode object
      *
-          
+     * @param mode {Object}         
+     * @returns {Object} the created mode
+     */
+    createMode: function (mode) {
+        var url = this.serverUrl + '/v1/modes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
+        return new Promise ((resolve, reject) => { 
+            this.request.post(url, {
+                body: mode,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
+    },
+
+    /**
+     * Update a mode.
+     * The mode object needs to contain a valid _id
+     *
+     * @param mode
+     * @returns the updated mode
+     */    
+    updateMode: function (mode) {
+        return new Promise ((resolve, reject) => {
+            this.request.put(this.serverUrl + '/v1/modes/' + mode._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
+                body: mode,
+                json: true
+            }).then(resolve).catch(e => { reject(e.message) });
+        });
+    },
+
+    /**
+     * Delete a mode by id
+     *
+     * @param modeId
+     */
+    deleteMode: function (modeId) {
+        return new Promise ((resolve, reject) => {
+            this.request.delete(this.serverUrl + '/v1/modes/' + modeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
+            .then(resolve).catch(e => { reject(e.message) });
+        });
+    },
+
+    /**
+     * Get all venues of organization (including unpublished)
+     *     
      * @returns the list of venues if signing in was successful
      */
     getVenues: function () {
