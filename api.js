@@ -1212,6 +1212,19 @@ MapwizeApi.prototype = {
     syncVenueTemplates: async function (venueId, objects, options) {
         return await syncVenueObjects('template', 'Template', 'Templates', this.isTemplateEqual, this, venueId, objects, options);
     },
+    
+    /**
+    * Create, update or delete all places on the placelist.
+    *
+    * @param venueId {String}
+    * @param sourceId {String}
+    * @param places {Object}s {Object} list of places
+    */
+    syncVenuePlacesWithSource: async function (venueId, sourceId, places) {
+        await this.updatePlaceSourceData(venueId, sourceId, places)
+        await this.updatePlaceSourceConfig(venueId, sourceId, {})
+        return await this.runPlaceSourceJob(venueId, sourceId, places)
+    },
 
     /**
      * Retrieves the list of sources for a venue
