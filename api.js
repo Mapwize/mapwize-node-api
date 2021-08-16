@@ -1,11 +1,13 @@
-var request = require('request-promise');
-var _ = require('lodash');
-var async = require('async');
+const _ = require('lodash');
+const { CookieJar } = require('tough-cookie');
+const got = require('got');
+const FormData = require('form-data');
+
 
 module.exports = MapwizeApi;
 
 function getComparableLayer(layer) {
-    var comparableLayer = _.pick(layer, ['owner', 'venueId', 'name', 'alias', 'floor', 'isPublished', 'universes']);
+    let comparableLayer = _.pick(layer, ['owner', 'venueId', 'name', 'alias', 'floor', 'isPublished', 'universes']);
     _.defaults(comparableLayer, {
         alias: layer.name.replace(/\W+/g, '_').toLowerCase(),
         isPublished: false,
@@ -16,7 +18,7 @@ function getComparableLayer(layer) {
 };
 
 function getComparablePlace(place) {
-    var comparablePlace = _.pick(place, ['owner', 'venueId', 'placeTypeId', 'name', 'alias', 'floor', 'geometry', 'marker', 'entrance', 'order', 'isPublished', 'isSearchable', 'isVisible', 'isClickable', 'style', 'data', 'universes']);
+    let comparablePlace = _.pick(place, ['owner', 'venueId', 'placeTypeId', 'name', 'alias', 'floor', 'geometry', 'marker', 'entrance', 'order', 'isPublished', 'isSearchable', 'isVisible', 'isClickable', 'style', 'data', 'universes']);
     _.defaults(comparablePlace, {
         alias: place.name.replace(/\W+/g, '_').toLowerCase(),
         order: 0,
@@ -36,7 +38,7 @@ function getComparablePlace(place) {
 };
 
 function getComparablePlaceList(placeList) {
-    var comparablePlaceList = _.pick(placeList, ['owner', 'venueId', 'name', 'alias', 'placeIds', 'isPublished', 'isSearchable', 'data', 'icon', 'universes']);
+    let comparablePlaceList = _.pick(placeList, ['owner', 'venueId', 'name', 'alias', 'placeIds', 'isPublished', 'isSearchable', 'data', 'icon', 'universes']);
     _.defaults(comparablePlaceList, {
         alias: placeList.name.replace(/\W+/g, '_').toLowerCase(),
         isPublished: false,
@@ -52,7 +54,7 @@ function getComparablePlaceList(placeList) {
 };
 
 function getComparableConnector(connector) {
-    var comparableConnector = _.pick(connector, ['owner', 'venueId', 'name', 'type', 'direction', 'isAccessible', 'waitTime', 'timePerFloor', 'isActive', 'icon']);
+    let comparableConnector = _.pick(connector, ['owner', 'venueId', 'name', 'type', 'direction', 'isAccessible', 'waitTime', 'timePerFloor', 'isActive', 'icon']);
     _.defaults(comparableConnector, {
         isAccessible: true,
         waitTime: 0,
@@ -64,7 +66,7 @@ function getComparableConnector(connector) {
 };
 
 function getComparableBeacon(beacon) {
-    var comparableBeacon = _.pick(beacon, ['name', 'owner', 'venueId', 'type', 'location', 'floor', 'isPublished', 'properties']);
+    let comparableBeacon = _.pick(beacon, ['name', 'owner', 'venueId', 'type', 'location', 'floor', 'isPublished', 'properties']);
     _.defaults(beacon, {
         isPublished: false,
         properties: {}
@@ -73,7 +75,7 @@ function getComparableBeacon(beacon) {
 }
 
 function getComparableTemplate(template) {
-    var comparableTemplate = _.pick(template, ['name', 'owner', 'venueId', 'description', 'url', 'placeTypeId', 'isPublished', 'isSearchable', 'isVisible', 'isClickable', 'style', 'tags', 'searchKeywords', 'data']);
+    let comparableTemplate = _.pick(template, ['name', 'owner', 'venueId', 'description', 'url', 'placeTypeId', 'isPublished', 'isSearchable', 'isVisible', 'isClickable', 'style', 'tags', 'searchKeywords', 'data']);
     _.defaults(comparableTemplate, {
         isPublished: false,
         isSearchable: true,
@@ -91,119 +93,112 @@ function getComparableTemplate(template) {
     return comparableTemplate;
 }
 
-function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlural, isEqualFunction, MapwizeApiClient, venueId, objects, options) {
-    var serverObjects;
-    var objectsToUpdate = [];
-    var objectsToCreate = [];
-    var objectsToDelete = [];
+async function syncVenueObjects(objectClass, objectClassCapSingular, objectClassCapPlural, isEqualFunction, MapwizeApiClient, venueId, objects, options) {
+    let serverObjects;
+    let objectsToUpdate = [];
+    let objectsToCreate = [];
+    let objectsToDelete = [];
 
-    return new Promise (async (resolve, reject) => {
-        try {
-            let allServerObjects = await MapwizeApiClient['getVenue' + objectClassCapPlural](venueId)
-            if (options.filter) {
-                serverObjects = _.filter(allServerObjects, options.filter);
-            } else {
-                serverObjects = allServerObjects;
-            }
+    let allServerObjects = await MapwizeApiClient['getVenue' + objectClassCapPlural](venueId)
+    if (options.filter) {
+        serverObjects = _.filter(allServerObjects, options.filter);
+    } else {
+        serverObjects = allServerObjects;
+    }
 
-            // Comparing all the objects to know which ones to create/update/delete
+    // Comparing all the objects to know which ones to create/update/delete
 
-            // Remove spaces in begin and end name of object if exist
-            _.forEach(objects, function (data) {
-                data.name = data.name.trim();
-            })
+    // Remove spaces in begin and end name of object if exist
+    _.forEach(objects, function (data) {
+        data.name = data.name.trim();
+    })
 
-            // Creating maps by name as the matching is done on the name
-            objectsByName = _.keyBy(objects, 'name');
-            serverObjectsByName = _.keyBy(serverObjects, 'name');
+    // Creating maps by name as the matching is done on the name
+    objectsByName = _.keyBy(objects, 'name');
+    serverObjectsByName = _.keyBy(serverObjects, 'name');
 
-            objectNames = _.map(objects, 'name');
-            serverObjectNames = _.map(serverObjects, 'name');
-            // Compare the objects with similar names
-            _.forEach(_.intersection(objectNames, serverObjectNames), function (name) {
-                objectsByName[name]._id = serverObjectsByName[name]._id; // We add the _id in the place if found
-                objectsByName[name]._syncAction = 'update';
-                if (!isEqualFunction(objectsByName[name], serverObjectsByName[name])) {
-                    objectsToUpdate.push(objectsByName[name]);
-                }
-            });
-
-            // Add the objects that are not on the server
-            _.forEach(_.difference(objectNames, serverObjectNames), function (name) {
-                objectsByName[name]._syncAction = 'create';
-                objectsToCreate.push(objectsByName[name]);
-            });
-
-            // Delete all the objects that are on the server but not in objects
-            _.forEach(_.difference(serverObjectNames, objectNames), function (name) {
-                serverObjectsByName[name]._syncAction = 'delete';
-                objectsToDelete.push(serverObjectsByName[name]);
-            });
-
-            console.log('Server objects: ' + serverObjects.length);
-            console.log('Objects to create: ' + objectsToCreate.length);
-            console.log('Objects to delete: ' + objectsToDelete.length);
-            console.log('Objects to update: ' + objectsToUpdate.length);
-
-            // Delete objects
-            if (!options.dryRun) {
-                var cmpt = 1;
-                if (objectsToDelete.length != 0) {
-                    console.log("\ndelete:")
-                }
-
-                for(const object of objectsToDelete) {
-                    try {
-                        await MapwizeApiClient['delete' + objectClassCapSingular](object._id);
-                        console.log(cmpt + "/" + objectsToDelete.length)
-                        cmpt++;
-                    } catch (error) {
-                        throw Error('DELETE ERR', error.message)
-                    }                    
-                };
-            }
-
-            // Update objects
-            if (!options.dryRun) {
-                var cmpt = 1;
-                if (objectsToUpdate.length != 0) {
-                    console.log("\nupdate:")
-                }
-                for(const object of objectsToUpdate) {
-                    try {
-                        await MapwizeApiClient['update' + objectClassCapSingular](object);
-                        console.log(cmpt + "/" + objectsToUpdate.length)
-                        cmpt++;
-                    } catch (error) {
-                        throw Error('UPDATE ERR', error.message)
-                    }
-                };
-            } 
-
-            // Create objects
-            if (!options.dryRun) {
-                var cmpt = 1;
-                if (objectsToCreate.length != 0) {
-                    console.log("\ncreate:")
-                }
-                for(const object of objectsToCreate) {
-                    try {
-                        let createdObject = await MapwizeApiClient['create' + objectClassCapSingular](object)
-                        object._id = createdObject._id;
-                        console.log(cmpt + "/" + objectsToCreate.length);
-                        cmpt++; 
-                    } catch (error) {
-                        throw Error('CREATE ERR', error.message)                        
-                    }
-                };
-            }
-
-            resolve([serverObjects, objectsToCreate, objectsToDelete, objectsToUpdate])
-
-        } catch (err) {
-            reject(err)
+    objectNames = _.map(objects, 'name');
+    serverObjectNames = _.map(serverObjects, 'name');
+    // Compare the objects with similar names
+    _.forEach(_.intersection(objectNames, serverObjectNames), function (name) {
+        objectsByName[name]._id = serverObjectsByName[name]._id; // We add the _id in the place if found
+        objectsByName[name]._syncAction = 'update';
+        if (!isEqualFunction(objectsByName[name], serverObjectsByName[name])) {
+            objectsToUpdate.push(objectsByName[name]);
         }
     });
+
+    // Add the objects that are not on the server
+    _.forEach(_.difference(objectNames, serverObjectNames), function (name) {
+        objectsByName[name]._syncAction = 'create';
+        objectsToCreate.push(objectsByName[name]);
+    });
+
+    // Delete all the objects that are on the server but not in objects
+    _.forEach(_.difference(serverObjectNames, objectNames), function (name) {
+        serverObjectsByName[name]._syncAction = 'delete';
+        objectsToDelete.push(serverObjectsByName[name]);
+    });
+
+    console.log('Server objects: ' + serverObjects.length);
+    console.log('Objects to create: ' + objectsToCreate.length);
+    console.log('Objects to delete: ' + objectsToDelete.length);
+    console.log('Objects to update: ' + objectsToUpdate.length);
+
+    // Delete objects
+    if (!options.dryRun) {
+        let cmpt = 1;
+        if (objectsToDelete.length != 0) {
+            console.log("\ndelete:")
+        }
+
+        for(const object of objectsToDelete) {
+            try {
+                await MapwizeApiClient['delete' + objectClassCapSingular](object._id);
+                console.log(cmpt + "/" + objectsToDelete.length)
+                cmpt++;
+            } catch (error) {
+                throw Error('DELETE ERR', error.message)
+            }                    
+        };
+    }
+
+    // Update objects
+    if (!options.dryRun) {
+        let cmpt = 1;
+        if (objectsToUpdate.length != 0) {
+            console.log("\nupdate:")
+        }
+        for(const object of objectsToUpdate) {
+            try {
+                await MapwizeApiClient['update' + objectClassCapSingular](object);
+                console.log(cmpt + "/" + objectsToUpdate.length)
+                cmpt++;
+            } catch (error) {
+                throw Error('UPDATE ERR', error.message)
+            }
+        };
+    } 
+
+    // Create objects
+    if (!options.dryRun) {
+        let cmpt = 1;
+        if (objectsToCreate.length != 0) {
+            console.log("\ncreate:")
+        }
+        for(const object of objectsToCreate) {
+            try {
+                let createdObject = await MapwizeApiClient['create' + objectClassCapSingular](object)
+                object._id = createdObject._id;
+                console.log(cmpt + "/" + objectsToCreate.length);
+                cmpt++; 
+            } catch (error) {
+                throw Error('CREATE ERR', error.message)                        
+            }
+        };
+    }
+
+    return [serverObjects, objectsToCreate, objectsToDelete, objectsToUpdate];
 
 };
 
@@ -228,9 +223,9 @@ function MapwizeApi(apiKey, organizationId, opts) {
         opts = {};
     }
 
-    var cookie = request.jar();
-    this.request = request.defaults({ jar: cookie });
-
+    const cookieJar = new CookieJar();
+    this.got = got.extend({ cookieJar })
+    
     this.serverUrl = opts.serverUrl || 'https://api.mapwize.io';
     this.apiKey = apiKey;
     this.organizationId = organizationId;
@@ -246,16 +241,13 @@ MapwizeApi.prototype = {
      * @returns {Object} the user object if signing in was successful
      */
 
-    signIn: function (email, password) {
-        var credentials = {
+    signIn: async function (email, password) {
+        let credentials = {
             email: email,
             password: password
         };
-        //console.log(this.serverUrl + '/auth/signin');
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/auth/signin?api_key=' + this.apiKey, { form: credentials, json: true })
-            .then(resolve).catch(e => { reject(e.message) });
-        })
+        const { body } = await this.got.post(`${this.serverUrl}/v1/auth/signin?api_key=${this.apiKey}`, { json: credentials })
+        return body;
     },
 
     /**
@@ -263,11 +255,10 @@ MapwizeApi.prototype = {
      *
      * @returns {Array} the list of access groups if signing in was successful
      */
-    getAccessGroups: function () {
-        var url = this.serverUrl + '/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {             
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });         
-        });
+    getAccessGroups: async function () {
+        let url = `${this.serverUrl}/v1/accessGroups?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });         
+        return body;
     },
 
     /**
@@ -277,14 +268,10 @@ MapwizeApi.prototype = {
      * @param accessGroup {Object}         
      * @returns {Object} the created accessGroup
      */
-    createAccessGroup: function (accessGroup) {
-        var url = this.serverUrl + '/v1/accessGroups?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => { 
-            this.request.post(url, {
-                body: accessGroup,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
-        });
+    createAccessGroup: async function (accessGroup) {
+        let url = `${this.serverUrl}/v1/accessGroups?organizationId=${this.organizationId}&api_key= ${this.apiKey}`;
+        const { body } = await this.got.post(url, { json: accessGroup, responseType: 'json' });
+        return body;
     },
 
     /**
@@ -294,11 +281,10 @@ MapwizeApi.prototype = {
      * @returns the list of universes if signing in was successful
      */
 
-    getApiKeys: function () {
-        var url = this.serverUrl + '/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getApiKeys: async function () {
+        let url = `${this.serverUrl}/v1/applications?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -308,40 +294,30 @@ MapwizeApi.prototype = {
           
      * @returns the created accessGroups
      */
-    createApiKey: function (apiKey) {
-        var url = this.serverUrl + '/v1/applications?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, {
-                body: apiKey,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
-        });
+    createApiKey: async function (apiKey) {
+        let url = `${this.serverUrl}/v1/applications?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got.post(url, { json: apiKey, responseType: 'json' });
+        return body;
     },
     
     /**
      * Delete api key
      *
      * @param apiKeyId
-     * @param callback the result callback called with one argument
-     *  error: null or Error('message')
      */
-    deleteApiKey: function (apiKeyId, callback) {
-        this.request.delete(this.serverUrl + '/v1/applications/' + apiKeyId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey, responseWrapper(callback, 204));
+    deleteApiKey: async function (apiKeyId) {
+        await this.got.delete(`${this.serverUrl}/v1/applications/${apiKeyId}?organizationId=${this.organizationId}&api_key=${this.apiKey}`);
     },
     
     /**
      * Get all place types
      *
-     * @param callback
-     *  error: null or Error('message')
-     *  content: the list of place types
      */
 
-    getPlaceTypes: function () {
-        var url = this.serverUrl + '/v1/placetypes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getPlaceTypes: async function () {
+        let url = `${this.serverUrl}/v1/placetypes?api_key=${this.apiKey}&organizationId=${this.organizationId}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -351,13 +327,10 @@ MapwizeApi.prototype = {
      * @param placetype
      * @returns the created placeType
      */
-    createPlaceType: function (placetype) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/placetypes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: placetype,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
-        });
+    createPlaceType: async function (placetype) {
+        const url = `${this.serverUrl}/v1/placetypes?api_key=${this.apiKey}&organizationId=${this.organizationId}`;
+        const { body } = await this.got.post(url, { json: placetype, responseType: 'json' });
+        return body;
     },
 
     /**
@@ -367,13 +340,10 @@ MapwizeApi.prototype = {
      * @param placetype
      * @returns the updated placetype
      */
-    updatePlaceType: function (placetype) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/placetypes/' + placetype._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: placetype,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
-        });
+    updatePlaceType: async function (placetype) {
+        const url = `${this.serverUrl}/v1/placetypes/${placetype._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`;
+        const { body } = await this.got.put(url, { json: placetype, responseType: 'json' });
+        return body;
     },
 
     /**
@@ -381,11 +351,8 @@ MapwizeApi.prototype = {
      *
      * @param placetypeId
      */
-    deletePlaceType: function (placetypeId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/placetypes/' + placetypeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deletePlaceType: async function (placetypeId) {
+        await this.got.delete(`${this.serverUrl}/v1/placetypes/${placetypeId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`);
     },
 
     /**
@@ -394,11 +361,10 @@ MapwizeApi.prototype = {
           
      * @returns the list of universes if signing in was successful
      */
-    getUniverses: function () {
-        var url = this.serverUrl + '/v1/universes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getUniverses: async function () {
+        let url = `${this.serverUrl}/v1/universes?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -408,13 +374,12 @@ MapwizeApi.prototype = {
      * @param universe
      * @returns the created universe
      */
-    createUniverse: function (universe) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/universes?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: universe,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    createUniverse: async function (universe) {
+        const { body } = await this.got.post(`${this.serverUrl}/v1/universes?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: universe,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -425,13 +390,12 @@ MapwizeApi.prototype = {
      * @returns the updated universe
      */
 
-    updateUniverse: function (universe) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/universes/' + universe._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: universe,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateUniverse: async function (universe) {
+        const { body } = await this.got.put(`${this.serverUrl}/v1/universes/${universe._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: universe,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -439,11 +403,10 @@ MapwizeApi.prototype = {
      *    
      * @returns the list of modes
      */
-    getModes: function () {
-        var url = this.serverUrl + '/v1/modes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&isPublished=all';
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });        
+    getModes: async function () {
+        let url = `${this.serverUrl}/v1/modes?organizationId=${this.organizationId}&api_key=${this.apiKey}&isPublished=all`;
+        const { body } = await this.got(url, { responseType: 'json' }); 
+        return body;       
     }, 
 
     /**
@@ -453,14 +416,10 @@ MapwizeApi.prototype = {
      * @param mode {Object}         
      * @returns {Object} the created mode
      */
-    createMode: function (mode) {
-        var url = this.serverUrl + '/v1/modes?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => { 
-            this.request.post(url, {
-                body: mode,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
-        });
+    createMode: async function (mode) {
+        let url = `${this.serverUrl}/v1/modes?organizationId=${this.organizationId}&api_key=${this.apiKey}`;    
+        const { body } = await this.got.post(url, { json: mode, responseType: 'json' });
+        return body;
     },
 
     /**
@@ -470,13 +429,12 @@ MapwizeApi.prototype = {
      * @param mode
      * @returns the updated mode
      */    
-    updateMode: function (mode) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/modes/' + mode._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: mode,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateMode: async function (mode) {
+        const { body } = await this.got.put(`${this.serverUrl}/v1/modes/${mode._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: mode,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -484,11 +442,8 @@ MapwizeApi.prototype = {
      *
      * @param modeId
      */
-    deleteMode: function (modeId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/modes/' + modeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deleteMode: async function (modeId) {
+        await this.got.delete(`${this.serverUrl}/v1/modes/${modeId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`);
     },
 
     /**
@@ -496,11 +451,10 @@ MapwizeApi.prototype = {
      *     
      * @returns the list of venues if signing in was successful
      */
-    getVenues: function () {
-        var url = this.serverUrl + '/v1/venues?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&isPublished=all';
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });        
+    getVenues: async function () {
+        let url = `${this.serverUrl}/v1/venues?organizationId=${this.organizationId}&api_key=${this.apiKey}&isPublished=all`;
+        const { body } = await got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -508,11 +462,9 @@ MapwizeApi.prototype = {
      *        
      * @returns the venue if signing in was successful
      */
-    getVenue: function (venueId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getVenue: async function (venueId) {
+        const { body } = await got(`${this.serverUrl}/v1/venues/${venueId}?organizationId=${this.organizationId}&api_key=${this.apiKey}`, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -522,13 +474,12 @@ MapwizeApi.prototype = {
      * @param venue
      * @returns the created venue
      */
-    createVenue: function (venue) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/venues?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: venue,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    createVenue: async function (venue) {
+        const { body } = await this.got.post(`${this.serverUrl}/v1/venues?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: venue,
+            responseType: 'json' 
         });
+        return body;
     },
 
     /**
@@ -538,13 +489,12 @@ MapwizeApi.prototype = {
      * @param venue
      * @returns the updated venue
      */
-    updateVenue: function (venue) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/venues/' + venue._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: venue,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateVenue: async function (venue) {  
+        const { body } = await this.got.put(`${this.serverUrl}/v1/venues/${venue._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: venue,
+            responseType: 'json'   
         });
+        return body;
     },
 
     /**
@@ -554,43 +504,28 @@ MapwizeApi.prototype = {
 
      * @returns the places
      */
-    getVenuePlaces: function (venueId) {
-        var self = this;
+    getVenuePlaces: async function (venueId) {
+        let self = this;
 
-        var emptyResponse = false;
-        var page = 0;
-        var places = [];
+        let emptyResponse = false;
+        let page = 0;
+        let places = [];
 
-        return new Promise((resolve, reject) => {
-            async.until(
-                (callback) => callback(null, emptyResponse),
-                nextPage => {
-                    page++;
+        do {
+            page++;
 
-                    var url = self.serverUrl + '/v1/places?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&isPublished=all&page=' + page;
+            let url = `${self.serverUrl}/v1/places?organizationId=${self.organizationId}&api_key=${self.apiKey}&venueId=${venueId}&isPublished=all&page=${page}`;
 
-                    self.request.get(url, { json: true })
-                    .then((body) => {
-                        var serverPlacesPage =  body;
+            const { body } = await self.got(url, { responseType: 'json' });
+            let serverPlacesPage =  body;
 
-                        if (serverPlacesPage.length) {
-                            places = _.concat(places, serverPlacesPage);
-                        }
-                        emptyResponse = serverPlacesPage.length === 0;
-                        nextPage();
-                    }).catch(e => {
-                        nextPage(e);
-                    });
-            },
-            err => {
-                if(err) {
-                    reject(err.message);
-                }
-                else {
-                    resolve(places);
-                }
-            });
-        });
+            if (serverPlacesPage.length) {
+                places = _.concat(places, serverPlacesPage);
+            }
+            emptyResponse = serverPlacesPage.length === 0;
+        } while (emptyResponse);
+        
+        return places;
     },
 
     /**
@@ -598,11 +533,9 @@ MapwizeApi.prototype = {
      *
      * @param placeId
      */
-    deletePlace: function (placeId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/places/' + placeId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deletePlace: async function (placeId) {
+        const { body } = await this.got.delete(`${this.serverUrl}/v1/places/${placeId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`);    
+        return body;
     },
 
     /**
@@ -612,13 +545,12 @@ MapwizeApi.prototype = {
      * @param place
      * @returns the created place
      */
-    createPlace: function (place) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/places?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: place,
-                json: true
-            }).then(resolve).catch(e => { console.log(e); reject(e.message) });
+    createPlace: async function (place) {
+        const { body } = await this.got.post(`${this.serverUrl}/v1/places?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: place,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -628,13 +560,12 @@ MapwizeApi.prototype = {
      * @param place
      * @returns the updated place
      */
-    updatePlace: function (place) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/places/' + place._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: place,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updatePlace: async function (place) {
+        const { body } = await this.got.put(`${this.serverUrl}/v1/places/${place._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: place,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -642,11 +573,10 @@ MapwizeApi.prototype = {
      *
      * @returns the place if signing in was successful
      */
-    getPlace: function (placeId) {
-        var url = this.serverUrl + '/v1/places/' + placeId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getPlace: async function (placeId) {
+        let url = `${this.serverUrl}/v1/places/${placeId}?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -656,11 +586,10 @@ MapwizeApi.prototype = {
           
      * @returns the placeLists
      */
-    getVenuePlaceLists: function (venueId) {
-        var url = this.serverUrl + '/v1/placeLists?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getVenuePlaceLists: async function (venueId) {
+        let url = `${this.serverUrl}/v1/placeLists?organizationId=${this.organizationId}&api_key=${this.apiKey}&venueId=${venueId}&isPublished=all`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -668,11 +597,9 @@ MapwizeApi.prototype = {
      *
      * @param placeListId
      */
-    deletePlaceList: function (placeListId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/placeLists/' + placeListId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deletePlaceList: async function (placeListId) {
+        const { body } = await this.got.delete(`${this.serverUrl}/v1/placeLists/${placeListId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`);
+        return body;
     },
 
     /**
@@ -682,13 +609,12 @@ MapwizeApi.prototype = {
      * @param placeList
      * @returns the created placeList
      */
-    createPlaceList: function (placeList) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/placeLists?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: placeList,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    createPlaceList: async function (placeList) {
+        const { body } = await this.got.post(`${this.serverUrl}/v1/placeLists?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: placeList,
+            responseType: 'json'    
         });
+        return body;
     },
 
     /**
@@ -698,13 +624,12 @@ MapwizeApi.prototype = {
      * @param placeList
      * @returns the updated placeList
      */
-    updatePlaceList: function (placeList) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/placeLists/' + placeList._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: placeList,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updatePlaceList: async function (placeList) {
+        const { body } = await this.got.put(`${this.serverUrl}/v1/placeLists/${placeList._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: placeList,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -714,11 +639,10 @@ MapwizeApi.prototype = {
           
      * @returns the beacons
      */
-    getVenueBeacons: function (venueId) {
-        var url = this.serverUrl + '/v1/beacons?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getVenueBeacons: async function (venueId) {
+        let url = `${this.serverUrl}/v1/beacons?organizationId=${this.organizationId}&api_key=${this.apiKey}&venueId=${venueId}&isPublished=all`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -728,14 +652,13 @@ MapwizeApi.prototype = {
      * @param beacon
      * @returns the created beacon
      */
-    createBeacon: function (beacon) {
-        var url = this.serverUrl + '/v1/beacons?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, {
-                body: beacon,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    createBeacon: async function (beacon) {
+        let url = `${this.serverUrl}/v1/beacons?api_key=${this.apiKey}&organizationId=${this.organizationId}`; 
+        const { body } = await this.got.post(url, {
+            json: beacon,
+            responseType: 'json'  
         });
+        return body;
     },
 
     /**
@@ -744,14 +667,13 @@ MapwizeApi.prototype = {
      * @param beacon
      * @returns the updated beacon
      */
-    updateBeacon: function (beacon) {
-        var url = this.serverUrl + '/v1/beacons/' + beacon._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId;
-        return new Promise ((resolve, reject) => {        
-            this.request.put(url, {
-                body: beacon,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateBeacon: async function (beacon) {
+        let url = `${this.serverUrl}/v1/beacons/${beacon._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`;        
+        const { body } = await this.got.put(url, {
+            json: beacon,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -759,11 +681,8 @@ MapwizeApi.prototype = {
      *
      * @param beaconId    
      */
-    deleteBeacon: function (beaconId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/beacons/' + beaconId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deleteBeacon: async function (beaconId) {
+        await this.got.delete(`${this.serverUrl}/v1/beacons/${beaconId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`);
     },
 
     /**
@@ -773,11 +692,10 @@ MapwizeApi.prototype = {
           
      * @returns the templates
      */
-    getVenueTemplates: function (venueId) {
-        var url = this.serverUrl + '/v1/placeTemplates?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getVenueTemplates: async function (venueId) {
+        let url = `${this.serverUrl}/v1/placeTemplates?organizationId=${this.organizationId}&api_key=${this.apiKey}&venueId=${venueId}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -787,13 +705,12 @@ MapwizeApi.prototype = {
      * @param template
      * @returns the created template
      */
-    createTemplate: function (template) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/placeTemplates?api_key=' + this.apiKey, {
-                body: template,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    createTemplate: async function (template) {
+        const { body } = await this.got.post(`${this.serverUrl}/v1/placeTemplates?api_key=${this.apiKey}`, {
+            json: template,
+            responseType: 'json' 
         });
+        return body;
     },
 
     /**
@@ -803,13 +720,12 @@ MapwizeApi.prototype = {
      * @param template
      * @returns the updated template
      */
-    updateTemplate: function (template) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/placeTemplates/' + template._id + '?api_key=' + this.apiKey, {
-                body: template,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateTemplate: async function (template) {
+        const { body } = await this.got.put(`${this.serverUrl}/v1/placeTemplates/${template._id}?api_key=${this.apiKey}`, {
+            json: template,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -817,11 +733,8 @@ MapwizeApi.prototype = {
      *
      * @param templateId
      */
-    deleteTemplate: function (templateId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/placeTemplates/' + templateId + '?api_key=' + this.apiKey)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deleteTemplate: async function (templateId) {
+        await this.got.delete(`${this.serverUrl}/v1/placeTemplates/${templateId}?api_key=${this.apiKey}`)
     },
 
     /**
@@ -831,11 +744,10 @@ MapwizeApi.prototype = {
           
      * @returns the layers
      */
-    getVenueLayers: function (venueId) {
-        var url = this.serverUrl + '/v1/layers?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId + '&isPublished=all';
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getVenueLayers: async function (venueId) {
+        let url = `${this.serverUrl}/v1/layers?organizationId=${this.organizationId}&api_key=${this.apiKey}&venueId=${venueId}&isPublished=all`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -843,11 +755,8 @@ MapwizeApi.prototype = {
      *
      * @param layerId
      */
-    deleteLayer: function (layerId) {
-        return new Promise ((resolve, reject) => {
-        this.request.delete(this.serverUrl + '/v1/layers/' + layerId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-        .then(resolve).catch(e => { reject(e.message) });
-        });
+    deleteLayer: async function (layerId) {
+        await this.got.delete(`${this.serverUrl}/v1/layers/${layerId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`)
     },
 
     /**
@@ -857,13 +766,12 @@ MapwizeApi.prototype = {
      * @param layer
      * @returns the created layer
      */
-    createLayer: function (layer) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/layers?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: layer,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    createLayer: async function (layer) {
+        const { body } = await this.got.post(`${this.serverUrl}/v1/layers?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: layer,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -873,13 +781,12 @@ MapwizeApi.prototype = {
      * @param layer
      * @returns the updated layer
      */
-    updateLayer: function (layer) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/layers/' + layer._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: layer,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateLayer: async function (layer) {    
+        const { body } = await this.got.put(`${this.serverUrl}/v1/layers/${layer._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: layer,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -889,11 +796,10 @@ MapwizeApi.prototype = {
           
      * @returns the connectors
      */
-    getVenueConnectors: function (venueId) {
-        var url = this.serverUrl + '/v1/connectors?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getVenueConnectors: async function (venueId) {
+        let url = `${this.serverUrl}/v1/connectors?organizationId=${this.organizationId}&api_key=${this.apiKey}&venueId=${venueId}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -901,11 +807,8 @@ MapwizeApi.prototype = {
      *
      * @param connectorId
      */
-    deleteConnector: function (connectorId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/connectors/' + connectorId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deleteConnector: async function (connectorId) {
+        await this.got.delete(`${this.serverUrl}/v1/connectors/${connectorId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`)
     },
 
     /**
@@ -915,13 +818,12 @@ MapwizeApi.prototype = {
      * @param connector
      * @returns the created connector
      */
-    createConnector: function (connector) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/connectors?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: connector,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    createConnector: async function (connector) {  
+        const { body } = await this.got.post(`${this.serverUrl}/v1/connectors?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: connector,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -931,13 +833,12 @@ MapwizeApi.prototype = {
      * @param connector
      * @returns the updated connector
      */
-    updateConnector: function (connector) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/connectors/' + connector._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: connector,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateConnector: async function (connector) {       
+        const { body } = await this.got.put(`${this.serverUrl}/v1/connectors/${connector._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: connector,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -950,31 +851,23 @@ MapwizeApi.prototype = {
      * @param bottomLeft {Object} {latitude longitude} for the bottom left corner
      * @param bottomRight {Object} {latitude longitude} for the bottom right corner
      */
-    uploadLayerImage: function (layerId, imageStream, topLeft, topRight, bottomLeft, bottomRight) {
-        var formData = {
-            importJob: JSON.stringify({
-                corners: [
-                    { lat: topLeft.latitude, lng: topLeft.longitude },
-                    { lat: topRight.latitude, lng: topRight.longitude },
-                    { lat: bottomLeft.latitude, lng: bottomLeft.longitude },
-                    { lat: bottomRight.latitude, lng: bottomRight.longitude },
-                ]
-            }),
-            file: {
-                value: imageStream,
-                options: {
-                    filename: 'image.png',
-                    contentType: 'image/png'
-                }
-            }
-        };
-        var self = this;
-        return new Promise ((resolve, reject) => {
-            self.request.post({
-                url: self.serverUrl + '/v1/layers/' + layerId + '/image?api_key=' + self.apiKey + '&organizationId=' + self.organizationId,
-                formData: formData
-            }).then(resolve).catch(e => { reject(e.message) });
-        });
+    uploadLayerImage: async function (layerId, imageStream, topLeft, topRight, bottomLeft, bottomRight) {    
+        const importJob =  JSON.stringify({
+            corners: [
+                { lat: topLeft.latitude, lng: topLeft.longitude },
+                { lat: topRight.latitude, lng: topRight.longitude },
+                { lat: bottomLeft.latitude, lng: bottomLeft.longitude },
+                { lat: bottomRight.latitude, lng: bottomRight.longitude },
+            ]
+        })
+        
+        var data = new FormData();
+        data.append('file', imageStream);
+        data.append('importJob', importJob);
+
+        let self = this;
+        const url = `${self.serverUrl}/v1/layers/${layerId}/image?api_key=${self.apiKey}&organizationId=${self.organizationId}`;
+        await self.got.post(url, { body: data });
     },
 
     /**
@@ -983,11 +876,10 @@ MapwizeApi.prototype = {
      * @param venueId {String}          
      * @returns the routeGraphs
      */
-    getVenueRouteGraphs: function (venueId) {
-        var url = this.serverUrl + '/v1/routegraphs?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&venueId=' + venueId;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getVenueRouteGraphs: async function (venueId) {
+        let url = `${this.serverUrl}/v1/routegraphs?organizationId=${this.organizationId}&api_key=${this.apiKey}&venueId=${venueId}`;
+        const { body } = await this.got(url, { responseType: 'json'});
+        return body;
     },
 
     /**
@@ -995,11 +887,8 @@ MapwizeApi.prototype = {
      *
      * @param routeGraphId
      */
-    deleteRouteGraph: function (routeGraphId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/routegraphs/' + routeGraphId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deleteRouteGraph: async function (routeGraphId) {
+        await this.got.delete(`${this.serverUrl}/v1/routegraphs/${routeGraphId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`);
     },
 
     /**
@@ -1009,13 +898,12 @@ MapwizeApi.prototype = {
      * @param routeGraph
      * @returns the created routeGraph
      */
-    createRouteGraph: function (routeGraph) {
-        return new Promise ((resolve, reject) => {
-            this.request.post(this.serverUrl + '/v1/routegraphs?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: routeGraph,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    createRouteGraph: async function (routeGraph) {      
+        const { body } = await this.got.post(`${this.serverUrl}/v1/routegraphs?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: routeGraph,
+            responseType: 'json' 
         });
+        return body;
     },
 
     /**
@@ -1025,13 +913,12 @@ MapwizeApi.prototype = {
      * @param routeGraph
      * @returns the updated routeGraph
      */
-    updateRouteGraph: function (routeGraph) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/routegraphs/' + routeGraph._id + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: routeGraph,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateRouteGraph: async function (routeGraph) { 
+        const { body } = await this.got.put(`${this.serverUrl}/v1/routegraphs/${routeGraph._id}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: routeGraph,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -1042,26 +929,24 @@ MapwizeApi.prototype = {
      * @param routeGraph
      * @returns the updated routeGraph
      */
-    updateRouteGraphForFloor: function (venueId, floor, routeGraph) {
-        var self = this;
+    updateRouteGraphForFloor: async function (venueId, floor, routeGraph) {
+        let self = this;
         
-        return new Promise ((resolve, reject) => {
-            self.request.get(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey + '&venueId=' + venueId + '&floor=' + floor)
-            .then(body => {
-                var routeGraphs = JSON.parse(body);
-                if (routeGraphs.length > 0) {
-                    self.request.put(self.serverUrl + '/v1/routegraphs/' + routeGraphs[0]._id + '?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
-                        body: routeGraph,
-                        json: true
-                    }).then(resolve).catch(e => { reject(e.message) });
-                } else {
-                    self.request.post(self.serverUrl + '/v1/routegraphs?organizationId=' + self.organizationId + '&api_key=' + self.apiKey, {
-                        body: routeGraph,
-                        json: true
-                    }).then(resolve).catch(e => { reject(e.message) });
-                }
-            }).catch(e => { reject(e.message) });
-        });
+        const { body } = await self.got(`${self.serverUrl}/v1/routegraphs?organizationId=${self.organizationId}&api_key=${self.apiKey}&venueId=${venueId}&floor=${floor}`, { responseType: 'json' });
+        
+        let routeGraphs = JSON.parse(body);
+        if (routeGraphs.length > 0) {
+            await self.got.put(`${self.serverUrl}/v1/routegraphs/${routeGraphs[0]._id}?organizationId=${self.organizationId}&api_key=${self.apiKey}`, {
+                json: routeGraph,
+                responseType: 'json'
+            });
+        } 
+        else {
+            await self.got.post(`${self.serverUrl}/v1/routegraphs?organizationId=${self.organizationId}&api_key=${self.apiKey}`, {
+                json: routeGraph,
+                responseType: 'json'
+            });
+        }        
     },
 
     /**
@@ -1071,7 +956,7 @@ MapwizeApi.prototype = {
      * @param layer2
      * @returns {boolean}
      */
-    isLayerEqual: function (layer1, layer2) {
+    isLayerEqual: async function (layer1, layer2) {
         return _.isEqual(getComparableLayer(layer1), getComparableLayer(layer2));
     },
 
@@ -1082,7 +967,7 @@ MapwizeApi.prototype = {
      * @param place2
      * @returns {boolean}
      */
-    isPlaceEqual: function (place1, place2) {
+    isPlaceEqual: async function (place1, place2) {
         return _.isEqual(getComparablePlace(place1), getComparablePlace(place2));
     },
 
@@ -1093,7 +978,7 @@ MapwizeApi.prototype = {
      * @param placeList2
      * @returns {boolean}
      */
-    isPlaceListEqual: function (placeList1, placeList2) {
+    isPlaceListEqual: async function (placeList1, placeList2) {
         return _.isEqual(getComparablePlaceList(placeList1), getComparablePlaceList(placeList2));
     },
 
@@ -1104,7 +989,7 @@ MapwizeApi.prototype = {
      * @param connector2
      * @returns {boolean}
      */
-    isConnectorEqual: function (connector1, connector2) {
+    isConnectorEqual: async function (connector1, connector2) {
         return _.isEqual(getComparableConnector(connector1), getComparableConnector(connector2));
     },
 
@@ -1115,7 +1000,7 @@ MapwizeApi.prototype = {
      * @param beacon2
      * @returns {boolean}
      */
-    isBeaconEqual: function (beacon1, beacon2) {
+    isBeaconEqual: async function (beacon1, beacon2) {
         return _.isEqual(getComparableBeacon(beacon1), getComparableBeacon(beacon2));
     },
 
@@ -1125,7 +1010,7 @@ MapwizeApi.prototype = {
      * @param template2
      * @return {boolean}
      */
-    isTemplateEqual: function (template1, template2) {
+    isTemplateEqual: async function (template1, template2) {
         return _.isEqual(getComparableTemplate(template1), getComparableTemplate(template2));
     },
 
@@ -1218,11 +1103,10 @@ MapwizeApi.prototype = {
      *
      * @param venueId {String}
      */
-    getVenueSources: function (venueId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getVenueSources: async function (venueId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1231,14 +1115,10 @@ MapwizeApi.prototype = {
      * @param venueId {String} 
      * @param namePlaceSource
      */
-    createPlaceSource: function (venueId, namePlaceSource) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, {
-                body: { "name": namePlaceSource },
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
-        });
+    createPlaceSource: async function (venueId, namePlaceSource) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got.post(url, { json: { name: namePlaceSource }, responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1248,11 +1128,10 @@ MapwizeApi.prototype = {
      * @param placeSourceId {String}
      * @returns given place source
      */
-    getPlaceSource: function (venueId, placeSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getPlaceSource: async function (venueId, placeSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1262,13 +1141,12 @@ MapwizeApi.prototype = {
      * @param placeSourceId {String}
      * @param namePlaceSource
      */
-    updatePlaceSourceName: function (venueId, placeSourceId, namePlaceSource) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: { "name": namePlaceSource },
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updatePlaceSourceName: async function (venueId, placeSourceId, namePlaceSource) {
+        const { body } = await this.got.put(`${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: { name: namePlaceSource },
+            responseType: 'json'          
         });
+        return body;
     },
 
     /**
@@ -1277,11 +1155,8 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param placeSourceId {String}
      */
-    deletePlaceSource: function (venueId, placeSourceId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deletePlaceSource: async function (venueId, placeSourceId) {
+        await this.got.delete(`${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}?cascade=true&api_key=${this.apiKey}&organizationId=${this.organizationId}`);
     },
 
     /**
@@ -1291,11 +1166,10 @@ MapwizeApi.prototype = {
      * @param placeSourceId {String}
      * @returns data associated to a given place source
      */
-    getPlaceSourceData: function (venueId, placeSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getPlaceSourceData: async function (venueId, placeSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/data?organizationId=${this.organizationId}&api_key=${this.apiKey}&raw=true`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1305,11 +1179,10 @@ MapwizeApi.prototype = {
      * @param placeSourceId {String}
      * @param data
      */
-    updatePlaceSourceData: function (venueId, placeSourceId, data) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/data?organizationId=' + this.organizationId + '&api_key=' + this.apiKey + '&raw=true';        
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, { body: data, json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    updatePlaceSourceData: async function (venueId, placeSourceId, data) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/data?organizationId=${this.organizationId}&api_key=${this.apiKey}&raw=true`;        
+        const { body } = await this.got.post(url, { json: data, responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1319,11 +1192,10 @@ MapwizeApi.prototype = {
      * @param placeSourceId {String}
      * @returns {Object} the { jobId } in the response 
      */
-    runPlaceSourceSetupJob: function (venueId, placeSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    runPlaceSourceSetupJob: async function (venueId, placeSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/setup?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got.post(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1332,11 +1204,10 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param placeSourceId {String}
      */
-    getRunPlaceSourceSetupJob: function (venueId, placeSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getRunPlaceSourceSetupJob: async function (venueId, placeSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/setup?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1345,11 +1216,10 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param placeSourceId {String}
      */
-    getPlaceSourceParams: function (venueId, placeSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getPlaceSourceParams: async function (venueId, placeSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/params?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1358,11 +1228,10 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param placeSourceId {String}
      */
-    getPlaceSourceConfig: function (venueId, placeSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getPlaceSourceConfig: async function (venueId, placeSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/config?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1372,14 +1241,13 @@ MapwizeApi.prototype = {
      * @param placeSourceId {String}
      * @param options {Object} places => [Object] & propertyForGeoreference => String
      */
-    updatePlaceSourceConfig: function (venueId, placeSourceId, options) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.put(url, {
-                body: options,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updatePlaceSourceConfig: async function (venueId, placeSourceId, options) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/config?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got.put(url, {
+            json: options,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -1389,11 +1257,10 @@ MapwizeApi.prototype = {
      * @param placeSourceId {String}
      * @returns {Object} the { jobId } in the response
      */
-    runPlaceSourceJob: function (venueId, placeSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    runPlaceSourceJob: async function (venueId, placeSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/run?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got.post(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1402,11 +1269,10 @@ MapwizeApi.prototype = {
     * @param venueId {String}
     * @param placeSourceId {String}
     */
-    getRunPlaceSourceJob: function (venueId, placeSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/place/' + placeSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getRunPlaceSourceJob: async function (venueId, placeSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/place/${placeSourceId}/run?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1416,11 +1282,10 @@ MapwizeApi.prototype = {
      * @param autocadSourceId {String}
      * @returns data associated to a given Autocad source
      */
-    getAutocadSourceConfig: function (venueId, autocadSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getAutocadSourceConfig: async function (venueId, autocadSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/autocad/${autocadSourceId}/config?api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1430,11 +1295,10 @@ MapwizeApi.prototype = {
      * @param autocadSourceId {String}
      * @param data
      */
-    updateAutocadSourceConfig: function (venueId, autocadSourceId, data) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/autocad/' + autocadSourceId + '/config?api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.put(url, { body: data, json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    updateAutocadSourceConfig: async function (venueId, autocadSourceId, data) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/autocad/${autocadSourceId}/config?api_key=${this.apiKey}`;
+        const { body } = await this.got.put(url, { json: data, responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1443,14 +1307,10 @@ MapwizeApi.prototype = {
      * @param venueId {String} 
      * @param object {Object}
      */
-    createRasterSource: function (venueId, object) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, {
-                body: object,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
-        });
+    createRasterSource: async function (venueId, object) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got.post(url, { json: object, responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1459,11 +1319,10 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param rasterSourceId {String}
      */
-    getRasterSource: function (venueId, rasterSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getRasterSource: async function (venueId, rasterSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1473,13 +1332,12 @@ MapwizeApi.prototype = {
      * @param rasterSourceId {String}
      * @param object {Object}
      */
-    updateRasterSource: function (venueId, rasterSourceId, object) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: object,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    updateRasterSource: async function (venueId, rasterSourceId, object) {
+        const { body } = await this.got.put(`${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: object,
+            responseType: 'json'
         });
+        return body;
     },
 
     /**
@@ -1488,11 +1346,8 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param rasterSourceId {String}
      */
-    deleteRasterSource: function (venueId, rasterSourceId) {
-        return new Promise ((resolve, reject) => {
-            this.request.delete(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '?cascade=true&api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    deleteRasterSource: async function (venueId, rasterSourceId) {
+        await this.got.delete(`${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}?cascade=true&api_key=${this.apiKey}&organizationId=${this.organizationId}`);
     },
 
     /**
@@ -1501,11 +1356,11 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param rasterSourceId {String}
      */
-    getRasterSourcePng: function (venueId, rasterSourceId) {        
-        return new Promise ((resolve, reject) => {
-            this.request.get(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?api_key=' + this.apiKey + '&organizationId=' + this.organizationId)
-            .then(resolve).catch(e => { reject(e.message) });
-        });
+    getRasterSourcePng: async function (venueId, rasterSourceId) {        
+        const { body } = await this.got(`${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/file?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            responseType: 'buffer'
+        });  
+        return body;
     },
 
     /**
@@ -1515,24 +1370,13 @@ MapwizeApi.prototype = {
      * @param rasterSourceId {String}
      * @returns {Object} the { jobId } in the response
      */
-    setRasterSourcePng: function (venueId, rasterSourceId, imageStream) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/file?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        var formData = {
-            file: {
-                value: imageStream,
-                options: {
-                    filename: 'image.png',
-                    contentType: 'image/png'
-                }
-            }
-        };
-
-        return new Promise ((resolve, reject) => {
-            this.request.post({
-                url: url,
-                formData: formData
-            }).then(resolve).catch(e => { reject(e.message) });
-        })
+    setRasterSourcePng: async function (venueId, rasterSourceId, imageStream) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/file?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        var data = new FormData();
+        data.append('file', imageStream);
+        
+        const { body } = await this.got.post(url, { body: data });     
+        return body;
     },
     
     /**
@@ -1542,11 +1386,10 @@ MapwizeApi.prototype = {
      * @param rasterSourceId {String}
      * @returns {Object} the { jobId } in the response
      */
-    runRasterSourceSetupJob: function (venueId, rasterSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    runRasterSourceSetupJob: async function (venueId, rasterSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/setup?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got.post(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1555,11 +1398,10 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param rasterSourceId {String}
      */
-    getRasterSourceSetupJob: function (venueId, rasterSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/setup?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getRasterSourceSetupJob: async function (venueId, rasterSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/setup?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1568,28 +1410,26 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param rasterSourceId {String}
      */
-    waitRasterSourceSetupJob: function (venueId, rasterSourceId) {
-        var state;
-        return new Promise ((resolve, reject) => {            
-            async.doUntil( done => {
-                setTimeout( () => {
-                    this.getRasterSourceSetupJob(venueId, rasterSourceId)
-                    .then(info => {
-                        console.log(info);
-                        state = info.state;
-                        done();
-                    }).catch(e => { reject(e.message) })                   
-                }, 1000);
-            }, () => {
-                if (state == 'completed') {
-                    resolve(true);
-                } else {
-                    resolve(false);
-                }
-                //stuck, failed should fail
-            }, resolve()); 
-        });
-              
+    waitRasterSourceSetupJob: async function (venueId, rasterSourceId) {
+        let state;
+        
+        do {
+            setTimeout( async () => {
+                try {
+                    const info = await this.getRasterSourceSetupJob(venueId, rasterSourceId);
+                    console.log(info);
+                    state = info.state;
+                } catch (error) {
+                    return error;
+                }          
+            }, 1000);
+        } while (state);
+        
+        if (state === 'completed') {
+            return true;
+        } else {
+            return false;
+        }         
     },
 
     /**
@@ -1598,11 +1438,10 @@ MapwizeApi.prototype = {
     * @param venueId {String}
     * @param rasterSourceId {String}
     */
-    getRasterSourcePreviewPng: function (venueId, rasterSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/previewPNG?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    getRasterSourcePreviewPng: async function (venueId, rasterSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/previewPNG?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'buffer' });
+        return body;
     },
 
     /**
@@ -1611,11 +1450,10 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param rasterSourceId {String}
      */
-    getRasterSourceParams: function (venueId, rasterSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/params?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });       
-        });
+    getRasterSourceParams: async function (venueId, rasterSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/params?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1624,11 +1462,10 @@ MapwizeApi.prototype = {
      * @param venueId {String}
      * @param rasterSourceId {String}
      */
-    getRasterSourceConfig: function (venueId, rasterSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {             
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) }); 
-        });
+    getRasterSourceConfig: async function (venueId, rasterSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/config?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1638,13 +1475,12 @@ MapwizeApi.prototype = {
      * @param rasterSourceId {String}
      * @param config
      */
-    setRasterSourceConfig: function (venueId, rasterSourceId, config) {
-        return new Promise ((resolve, reject) => {
-            this.request.put(this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/config?api_key=' + this.apiKey + '&organizationId=' + this.organizationId, {
-                body: config,
-                json: true
-            }).then(resolve).catch(e => { reject(e.message) });
+    setRasterSourceConfig: async function (venueId, rasterSourceId, config) {      
+        const { body } = await this.got.put(`${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/config?api_key=${this.apiKey}&organizationId=${this.organizationId}`, {
+            json: config,
+            responseType: 'json'    
         });
+        return body;
     },
 
     /**
@@ -1654,11 +1490,10 @@ MapwizeApi.prototype = {
      * @param rasterSourceId {String}
      * @returns {Object} the { jobId } in the response
      */
-    runRasterSourceJob: function (venueId, rasterSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.post(url, { json: true }).then(resolve).catch(e => { reject(e.message) });
-        });
+    runRasterSourceJob: async function (venueId, rasterSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/run?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got.post(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1667,11 +1502,10 @@ MapwizeApi.prototype = {
     * @param venueId {String}
     * @param rasterSourceId {String}
     */
-    getRunRasterSourceJob: function (venueId, rasterSourceId) {
-        var url = this.serverUrl + '/v1/venues/' + venueId + '/sources/raster/' + rasterSourceId + '/run?organizationId=' + this.organizationId + '&api_key=' + this.apiKey;
-        return new Promise ((resolve, reject) => {
-            this.request.get(url, { json: true }).then(resolve).catch(e => { reject(e.message) });         
-        });
+    getRunRasterSourceJob: async function (venueId, rasterSourceId) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/sources/raster/${rasterSourceId}/run?organizationId=${this.organizationId}&api_key=${this.apiKey}`;
+        const { body } = await this.got(url, { responseType: 'json' });
+        return body;
     },
 
     /**
@@ -1681,15 +1515,15 @@ MapwizeApi.prototype = {
     * @param toOrganizationId {String} the organization where to clone
     * @param toVenueName {String} the name of the cloned venue (need to be different from the original venue name)
     */
-   cloneVenue: function (venueId, toOrganizationId, toVenueName) {
-    var url = this.serverUrl + '/v1/venues/' + venueId + '/clone?api_key=' + this.apiKey;
-    return new Promise ((resolve, reject) => {
-        this.request.post(url, {
-            body:{
+    cloneVenue: async function (venueId, toOrganizationId, toVenueName) {
+        let url = `${this.serverUrl}/v1/venues/${venueId}/clone?api_key=${this.apiKey}`;
+        const { body } = await this.got.post(url, {
+            json:{
                 toOrganizationId: toOrganizationId,
                 toVenueName: toVenueName
             },
-            json: true }).then(resolve).catch(e => { reject(e.message) });         
-    });
-},
+            responseType: 'json'          
+        });
+        return body;
+    },
 };
